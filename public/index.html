@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VibeOps Tracker</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#161a22" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header id="topbar">
+    <h1>VibeOps Tracker</h1>
+    <select id="project-select" aria-label="Project"></select>
+    <input id="search" type="search" placeholder="Search cards…" aria-label="Search issues" />
+    <span id="issue-count"></span>
+    <nav id="view-toggle">
+      <button id="view-board" class="toggle-btn on">Board</button>
+      <button id="view-archive" class="toggle-btn">Archive</button>
+    </nav>
+    <button id="new-issue" class="btn btn-primary">+ New issue</button>
+    <a id="help-link" class="btn" href="/help.html">Help</a>
+  </header>
+  <main id="board"></main>
+  <aside id="drawer" hidden></aside>
+  <div id="drawer-backdrop" hidden></div>
+  <div id="modal-root"></div>
+  <script src="/app.js"></script>
+</body>
+</html>

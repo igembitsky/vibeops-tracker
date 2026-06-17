@@ -1,0 +1,62 @@
+{
+  "name": "vibeops-tracker",
+  "version": "0.1.0",
+  "description": "VibeOps Tracker: a local-first issue tracker. Capture, triage, and ship work across all your side projects with an embeddable widget, a Kanban board, markdown storage, and an MCP server that lets AI coding agents work your backlog.",
+  "type": "module",
+  "bin": {
+    "vibeops": "bin/cli.mjs",
+    "vibeops-mcp": "mcp-server.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "public/",
+    "server.mjs",
+    "mcp-server.mjs",
+    "README.md",
+    "LICENSE",
+    "AUTHORS"
+  ],
+  "scripts": {
+    "start": "node server.mjs",
+    "start:mcp": "node mcp-server.mjs",
+    "test": "node --test"
+  },
+  "keywords": [
+    "issue-tracker",
+    "bug-tracker",
+    "kanban",
+    "backlog",
+    "triage",
+    "mcp",
+    "model-context-protocol",
+    "ai-agents",
+    "claude",
+    "claude-code",
+    "markdown",
+    "local-first",
+    "self-hosted",
+    "vibe-coding",
+    "developer-tools"
+  ],
+  "author": "Igor Gembitsky",
+  "license": "MIT",
+  "homepage": "https://github.com/igembitsky/vibeops-tracker#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/igembitsky/vibeops-tracker.git"
+  },
+  "bugs": {
+    "url": "https://github.com/igembitsky/vibeops-tracker/issues"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "gray-matter": "^4.0.3"
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.0"
+  }
+}

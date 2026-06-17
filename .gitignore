@@ -1,0 +1,12 @@
+node_modules/
+*.log
+.DS_Store
+.playwright-cli/
+
+# Local tracker data — the real, machine-local issue store. Not versioned with
+# the code (it's a database, not source). Only the empty dir is kept.
+data/*
+!data/.gitkeep
+
+# Personal editor settings
+.vscode/

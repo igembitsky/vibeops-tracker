@@ -1,0 +1,4 @@
+# Normalize line endings; keep LF in executable entrypoints so shebangs work.
+* text=auto eol=lf
+*.png binary
+*.ico binary
