@@ -1,4 +1,4 @@
-/* Tracker board UI. All user-generated strings are rendered via textContent — never innerHTML. */
+/* Tracker board UI. All user-generated strings are rendered via textContent, never innerHTML. */
 (function () {
   'use strict';
 
@@ -343,7 +343,7 @@
     // so they stay static pills; open issues get a colored dropdown in their place.
     function patchPill(field, current, colorClass, options) {
       const sel = el('select', `pill pill-select ${colorClass}`);
-      sel.title = field === 'type' ? 'Type — click to change' : 'Severity — click to change';
+      sel.title = field === 'type' ? 'Type (click to change)' : 'Severity (click to change)';
       sel.setAttribute('aria-label', sel.title);
       for (const o of options) {
         const opt = el('option', null, o.label);
@@ -362,15 +362,15 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ [field]: value }),
           });
-          // Recolor the pill in place — no full re-render, so keyboard focus
-          // and the drawer's scroll position are preserved.
+          // Recolor the pill in place. There's no full re-render, so keyboard
+          // focus and the drawer's scroll position are preserved.
           sel.classList.replace(cls(prev), cls(value));
           issue[field] = value;
           refresh(); // sync the board card's color/severity
         } catch (err) {
           console.warn(`update ${field} failed`, err);
           sel.value = String(prev); // revert to the last committed value
-          openDrawer(issue.id); // resync — flips the drawer to read-only if the issue was closed mid-edit
+          openDrawer(issue.id); // resync, flipping the drawer to read-only if the issue was closed mid-edit
         }
       });
       return sel;
@@ -479,7 +479,7 @@
     comments.appendChild(el('h3', null, `Comments (${issue.comments.length})`));
     for (const c of issue.comments) {
       const item = el('div', 'comment');
-      item.appendChild(el('div', 'comment-head', `${c.author} — ${c.at ? new Date(c.at).toLocaleString() : ''}`));
+      item.appendChild(el('div', 'comment-head', `${c.author}, ${c.at ? new Date(c.at).toLocaleString() : ''}`));
       item.appendChild(el('div', 'comment-body', c.text));
       comments.appendChild(item);
     }
@@ -519,7 +519,7 @@
 
     const confirm = el('div', 'danger-confirm');
     confirm.style.display = 'none';
-    confirm.appendChild(el('div', 'danger-warn', `Permanently delete ${issue.id}? This can’t be undone — the issue file is removed for good.`));
+    confirm.appendChild(el('div', 'danger-warn', `Permanently delete ${issue.id}? This can’t be undone. The issue file is removed for good.`));
     const confirmBtns = el('div', 'danger-btns');
     const cancelDel = el('button', 'btn', 'Cancel');
     const reallyDel = el('button', 'btn btn-danger del-confirm', 'Delete permanently');

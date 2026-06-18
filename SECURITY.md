@@ -1,6 +1,6 @@
 # Security Policy
 
-## Threat model — read this first
+## Threat model (read this first)
 
 VibeOps Tracker is **local-first and localhost-only by design**. The server binds to
 `localhost`, has **no authentication**, and allows any origin (CORS `*`) so the

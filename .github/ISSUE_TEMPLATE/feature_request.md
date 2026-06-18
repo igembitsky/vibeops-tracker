@@ -16,5 +16,5 @@ What you'd like VibeOps Tracker to do.
 Anything you've considered or worked around.
 
 **Context**
-Anything else that helps — especially how it fits the "local-first, lightweight"
+Anything else that helps, especially how it fits the "local-first, lightweight"
 spirit of the tool.

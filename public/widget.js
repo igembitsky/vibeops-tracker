@@ -264,7 +264,7 @@
     if (e.key === 'Escape') closeDialog();
   });
 
-  // All toast content is plain text or an explicit link — never HTML, so a
+  // All toast content is plain text or an explicit link, never HTML, so a
   // compromised tracker response cannot inject markup into the host app.
   function toast(parts, ms) {
     var t = el('div', 'it-toast');
@@ -439,7 +439,7 @@
     try { seeing.focus(); } catch (_) {}
   }
 
-  // Single module-level pair of drag listeners — repeated dialog opens must not
+  // Single module-level pair of drag listeners, so repeated dialog opens do not
   // accumulate document-level handlers.
   var dragState = null;
   document.addEventListener(

@@ -10,5 +10,5 @@ harasses, demeans, or excludes others is not tolerated.
 To report a concern, contact **igor@canaryaware.com**. Reports are handled
 confidentially, and the maintainers are responsible for enforcement.
 
-For the full text — including the standards and enforcement guidelines — see the
+For the full text, including the standards and enforcement guidelines, see the
 linked Contributor Covenant.

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>VibeOps Tracker — Help</title>
+  <title>VibeOps Tracker Help</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -35,14 +35,14 @@
 </head>
 <body>
   <header id="topbar">
-    <h1>VibeOps Tracker — Help</h1>
+    <h1>VibeOps Tracker Help</h1>
     <a class="btn" href="/" style="margin-left:auto; text-decoration:none;">← Back to board</a>
   </header>
 
   <main id="help">
     <p>VibeOps Tracker is a standalone app on <code>http://localhost:4400</code>. Issues live as one markdown
-    file each under <code>data/&lt;project&gt;/issues/</code> in the tracker repo — readable and greppable by
-    you and by agents. Projects' own repos contain <strong>one line</strong> of tracker-related code: the widget script tag.</p>
+    file each under <code>data/&lt;project&gt;/issues/</code> in the tracker repo, so you and your agents can
+    read and grep them. Projects' own repos contain <strong>one line</strong> of tracker-related code: the widget script tag.</p>
 
     <div class="toc">
       <ul>
@@ -60,8 +60,8 @@
     <pre><code>&lt;script src="http://localhost:4400/widget.js" data-project="my-project" defer&gt;&lt;/script&gt;</code></pre>
     <p>That's the whole install. A floating 🐞 button appears; submitting the dialog posts the issue
     here with an automatic context snapshot: what you're looking at (URL, viewport, highlighted text)
-    is always attached, while the activity trail (last 10 clicks, last 10 fetches, recent JS errors
-    and failed requests) is a dialog checkbox — on by default for bugs, off for other types.
+    is always attached. The activity trail (last 10 clicks, last 10 fetches, recent JS errors
+    and failed requests) is a dialog checkbox, on by default for bugs and off for other types.
     The project key auto-registers on first capture.</p>
 
     <p>2. <em>Recommended:</em> tell the tracker where the project's repo lives, so generated prompts
@@ -70,8 +70,8 @@
   -H 'Content-Type: application/json' \
   -d '{"key": "my-project", "name": "My Project", "repo_path": "/absolute/path/to/repo"}'</code></pre>
 
-    <p>3. <em>Optional:</em> enrich captures with app state and git info (great for worktree workflows —
-    captures then record which branch/worktree they came from):</p>
+    <p>3. <em>Optional:</em> enrich captures with app state and git info (handy for worktree workflows,
+    since captures then record which branch/worktree they came from):</p>
     <pre><code>&lt;script&gt;
   window.IssueTracker.configure({
     context: () =&gt; ({
@@ -83,8 +83,8 @@
 
     <h2 id="disable">Disable / Enable / Remove</h2>
     <h3>Disable temporarily</h3>
-    <p>Comment out the script tag (the only integration point), or just stop the tracker server —
-    the widget fails safe and never breaks the host app:</p>
+    <p>Comment out the script tag (the only integration point), or just stop the tracker server.
+    The widget fails safe and never breaks the host app:</p>
     <pre><code>&lt;!-- &lt;script src="http://localhost:4400/widget.js" data-project="my-project" defer&gt;&lt;/script&gt; --&gt;</code></pre>
     <h3>Enable / re-enable</h3>
     <p>Uncomment (or re-add) the script tag, and make sure VibeOps Tracker is running: <code>cd /path/to/vibeops-tracker &amp;&amp; npm start</code> (or <code>npx vibeops-tracker</code>).</p>
@@ -96,10 +96,10 @@
     <h2 id="agents">Set up agent access (MCP)</h2>
     <p>Register once (user scope = available in every project's Claude Code sessions):</p>
     <pre><code>claude mcp add vibeops -- npx -y -p vibeops-tracker vibeops-mcp</code></pre>
-    <p>Tools: <code>get_tracker_instructions</code> (the workflow doctrine — agents should call it first),
+    <p>Tools: <code>get_tracker_instructions</code> (the workflow doctrine, which agents should call first),
     <code>list_projects</code>, <code>list_issues</code>, <code>search_issues</code>, <code>get_issue</code>,
     <code>create_issue</code>, <code>update_issue</code>, <code>add_comment</code>,
-    <code>resolve_issue</code>, <code>delete_issue</code> (permanent — requires <code>confirm: true</code>).
+    <code>resolve_issue</code>, <code>delete_issue</code> (permanent, requires <code>confirm: true</code>).
     The MCP server reads the markdown files directly, so it works even when
     the web server is down.</p>
 
@@ -107,7 +107,7 @@
     <h3>Manual capture → paste into a session</h3>
     <ol>
       <li>Hit the 🐞 button in any app when something is off; describe seeing/expecting; submit.
-      <em>Tip:</em> highlight the exact text you're talking about <em>before</em> hitting 🐞 — it's
+      <em>Tip:</em> highlight the exact text you're talking about <em>before</em> hitting 🐞, and it's
       attached to the report (previewed in the dialog, removable) and quoted prominently in the
       agent prompt. For non-bug reports the click/network/error trail is left off by default;
       tick "Include activity trail" if it matters.</li>
@@ -120,7 +120,7 @@
       <strong>Sweep</strong> the Done column into the Archive.</li>
     </ol>
     <h3>Agent-driven (MCP)</h3>
-    <p>With the MCP server registered, you don't need to copy anything — just tell any session what
+    <p>With the MCP server registered, you don't need to copy anything. Just tell any session what
     to do (see prompts below). Agents can also file issues themselves mid-task when they notice
     something out of scope.</p>
     <h3>Filing without a frontend</h3>
@@ -150,7 +150,7 @@ To disable temporarily instead of removing, comment the tag out. Make no other c
 get_tracker_instructions first, then list_issues for project "&lt;project-key&gt;" with status
 "backlog" and pick the FIRST one (it's the highest priority). Read it fully with get_issue,
 reproduce from the captured context, mark it in-progress, fix it, and finish with
-resolve_issue (resolution summary + modified files). Then stop for my review — do not pick
+resolve_issue (resolution summary + modified files). Then stop for my review. Do not pick
 up another ticket unless I say so.</code></pre>
 
     <h3>Triage what's on the board</h3>
@@ -160,7 +160,7 @@ a triage: which backlog items look quick vs. deep, anything that's probably a du
 Don't change anything yet.</code></pre>
 
     <h3>Migrate a roadmap / TODO file into the tracker</h3>
-    <pre class="prompt"><code>This project has roadmap/TODO files (ROADMAP.md, TODO.md, or similar — find them). Migrate
+    <pre class="prompt"><code>This project has roadmap/TODO files (ROADMAP.md, TODO.md, or similar; find them). Migrate
 their open items into my issue tracker via the issue-tracker MCP server (or curl to
 http://localhost:4400/api/issues if MCP is unavailable):
 1. Call get_tracker_instructions, then search_issues per item to skip anything already filed.
@@ -168,7 +168,7 @@ http://localhost:4400/api/issues if MCP is unavailable):
    seeing = current state/why it matters (quote the source file and line); expecting = done
    criteria as concretely as the source allows; type = feature/improvement/bug as appropriate;
    severity from any priority markers (default 3); tags = ["roadmap"] or ["todo"] plus topical tags.
-3. Keep one issue per actionable item — split grouped bullets, skip completed ones.
+3. Keep one issue per actionable item. Split grouped bullets, skip completed ones.
 4. When finished, report a table of created ids → titles, then UPDATE the source files: mark
    migrated items with their new issue id (e.g. "→ tracked as &lt;id&gt;") instead of deleting them.
 Do not start working on any of the issues.</code></pre>
@@ -181,18 +181,18 @@ Do not start working on any of the issues.</code></pre>
         at capture time; by pickup time the repo may have moved on. Prompts and instructions tell
         agents to verify against current state.</li>
       <li><strong>Issue files are the source of truth</strong>, stored under <code>data/</code> on your
-        machine. That directory is gitignored — it's real local tracker data, not versioned with the code,
-        so deletes are permanent (no git history to restore from). Don't hand-edit while the server is
+        machine. That directory is gitignored, so it holds real local tracker data that isn't versioned with the code,
+        which means deletes are permanent (no git history to restore from). Don't hand-edit while the server is
         mid-write; prefer the API/MCP (agents are told this).</li>
       <li><strong>Deletion is manual and permanent.</strong> Open any issue and use <strong>Delete issue</strong>
-        in the drawer's Danger zone (two-step confirm) to remove stale, test, or junk issues for good —
-        this works on archived issues too. Agents can delete as well, via the MCP <code>delete_issue</code>
+        in the drawer's Danger zone (two-step confirm) to remove stale, test, or junk issues for good.
+        This works on archived issues too. Agents can delete as well, via the MCP <code>delete_issue</code>
         tool (guarded by a required <code>confirm: true</code> flag); the doctrine tells them to reserve it
         for clearly stale/test/duplicate issues. For real issues you've resolved, prefer Done →
         <strong>Sweep</strong> to the Archive over deleting; link duplicates with <code>related_to</code>.</li>
       <li><strong>Statuses:</strong> backlog → in-progress → in-review → done. Agents never set
-        <em>done</em> — that's your verification step.</li>
-      <li><strong>localhost-only by design</strong> — the API has no auth and allows any origin; don't
+        <em>done</em>; that's your verification step.</li>
+      <li><strong>localhost-only by design.</strong> The API has no auth and allows any origin, so don't
         expose port 4400 beyond your machine.</li>
     </ul>
   </main>

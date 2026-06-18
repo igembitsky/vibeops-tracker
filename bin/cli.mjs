@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// VibeOps Tracker CLI — start the board/API server (default) or the MCP stdio server.
+// VibeOps Tracker CLI. Starts the board/API server (default) or the MCP stdio server.
 // A thin, dependency-free dispatcher.
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
@@ -18,7 +18,7 @@ function opt(names, takesValue) {
 const pkg = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 
 function help() {
-  console.log(`VibeOps Tracker ${pkg.version} — local-first issue tracker
+  console.log(`VibeOps Tracker ${pkg.version}. Local-first issue tracker.
 
 Usage:
   vibeops [start]        Start the board + API + capture widget (default)

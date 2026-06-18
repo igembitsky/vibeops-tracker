@@ -24,32 +24,32 @@ import { resolveDataDir } from './lib/data-dir.mjs';
 const DATA_DIR = resolveDataDir();
 const API_BASE = process.env.TRACKER_URL || 'http://localhost:4400';
 
-const INSTRUCTIONS = `# Issue tracker — how agents should work with it
+const INSTRUCTIONS = `# Issue tracker: how agents should work with it
 
-Issues are bug reports / feature requests captured from running apps (via an embedded
+Issues are bug reports and feature requests captured from running apps (via an embedded
 widget with a browser context snapshot) or filed by humans and agents. One markdown
-file per issue lives under ${DATA_DIR}/<project>/issues/. NEVER edit those files
-directly — always go through these MCP tools (or the REST API at ${API_BASE}/api).
-delete_issue permanently removes an issue (open or archived). It is IRREVERSIBLE —
-there is no archive copy — and requires confirm:true. Reserve it for stale, test,
+file per issue lives under ${DATA_DIR}/<project>/issues/. NEVER edit those files directly.
+Always go through these MCP tools (or the REST API at ${API_BASE}/api).
+delete_issue permanently removes an issue (open or archived). It is IRREVERSIBLE. There
+is no archive copy, and it requires confirm:true. Reserve it for stale, test,
 duplicate, or clearly no-longer-relevant issues, and prefer to delete only when the
-human asked or the issue is unambiguous junk; for real issues, prefer resolve_issue or
-add_comment. Never move an issue to done yourself — a human verifies in-review work.
+human asked or the issue is unambiguous junk. For real issues, prefer resolve_issue or
+add_comment. Never move an issue to done yourself, since a human verifies in-review work.
 
 Workflow:
-1. search_issues first when filing — avoid duplicates; link regressions with related_to.
-2. To pick up work: list_issues {project, status: "backlog"} — the FIRST result is the
+1. search_issues first when filing, so you avoid duplicates; link regressions with related_to.
+2. To pick up work: list_issues {project, status: "backlog"}. The FIRST result is the
    highest-priority item. Read it fully with get_issue; the captured ## Context
    (URL, clicks, fetches, JS errors, capture-time git state) usually localizes the bug.
-   Capture-time branch/worktree info may be stale — verify against the repo's current state.
+   Capture-time branch/worktree info may be stale, so verify against the repo's current state.
 3. Before coding: update_issue {id, status: "in-progress"}. Reproduce from context first.
 4. Leave add_comment notes (author: "claude") for anything notable mid-work.
-5. Finish with resolve_issue {id, resolution, modified_files} — a PR-style summary of
+5. Finish with resolve_issue {id, resolution, modified_files}, a PR-style summary of
    what changed, why, and how it was tested. This sets status to in-review; a HUMAN
    moves it to done after verifying. Never set done yourself.
 6. File new issues you notice with create_issue (seeing/expecting required).
 
-Statuses: ${STATUSES.join(' | ')}. Severity 1 (cosmetic) – 5 (blocker).`;
+Statuses: ${STATUSES.join(' | ')}. Severity 1 (cosmetic) to 5 (blocker).`;
 
 const TOOLS = [
   {
@@ -203,12 +203,12 @@ const TOOLS = [
   {
     name: 'delete_issue',
     description:
-      'Permanently delete an issue (open or archived). IRREVERSIBLE — the markdown file is removed with no archive copy (only git history could recover it). Reserve for stale, test, duplicate, or clearly no-longer-relevant issues; for real issues prefer resolve_issue or add_comment. Requires confirm: true.',
+      'Permanently delete an issue (open or archived). IRREVERSIBLE: the markdown file is removed with no archive copy (only git history could recover it). Reserve for stale, test, duplicate, or clearly no-longer-relevant issues; for real issues prefer resolve_issue or add_comment. Requires confirm: true.',
     inputSchema: {
       type: 'object',
       properties: {
         id: { type: 'string', description: 'Issue id, e.g. "platform-3"' },
-        confirm: { type: 'boolean', description: 'Must be true to proceed — a deliberate-action guard for an irreversible delete.' },
+        confirm: { type: 'boolean', description: 'Must be true to proceed. This is a deliberate-action guard for an irreversible delete.' },
       },
       required: ['id', 'confirm'],
       additionalProperties: false,
