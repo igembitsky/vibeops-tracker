@@ -168,6 +168,7 @@
     'background:#1f2937;color:#fff;border:none;cursor:pointer;z-index:2147483000;font-size:22px;',
     'box-shadow:0 4px 14px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;}',
     '.it-fab:hover{background:#111827;transform:scale(1.06);}',
+    '.it-fab.it-dragging{cursor:grabbing;transform:none;}',
     '.it-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:2147483001;}',
     '.it-dialog{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(440px,92vw);',
     'max-height:88vh;overflow:auto;background:#fff;color:#111827;border-radius:12px;z-index:2147483002;',
@@ -529,17 +530,78 @@
     var fab = el('button', 'it-fab', '🐞');
     fab.setAttribute('data-issue-tracker-ui', '1');
     fab.setAttribute('aria-label', 'Report an issue');
-    fab.title = 'Report an issue';
+    fab.title = 'Report an issue (drag to move it up or down)';
+
+    // The FAB stays pinned to the right edge, but you can drag it vertically so
+    // it never covers the host app. The chosen position is remembered per origin.
+    // A plain click (no drag) still opens the capture dialog.
+    var FAB_POS_KEY = 'itFabBottom';
+    var FAB_SIZE = 52; // matches .it-fab width/height in CSS
+    function clampBottom(px) {
+      var max = Math.max(8, window.innerHeight - FAB_SIZE - 8);
+      return Math.min(Math.max(8, px), max);
+    }
+    try {
+      var savedBottom = parseFloat(window.localStorage.getItem(FAB_POS_KEY));
+      if (!isNaN(savedBottom)) fab.style.bottom = clampBottom(savedBottom) + 'px';
+    } catch (_) {}
+
+    var fabDrag = null;
+    var fabWasDragged = false;
+
     fab.addEventListener(
       'mousedown',
-      safe(function () {
-        // Always assign (even when empty) so a previous capture's selection
-        // can never leak into a later, unrelated report.
+      safe(function (e) {
+        // Capture any current selection (always reassign so a previous capture's
+        // selection can never leak into a later, unrelated report).
         var sel = window.getSelection ? String(window.getSelection()) : '';
         state.selectedText = sel.slice(0, 500);
+        // Begin a potential drag.
+        fabWasDragged = false;
+        var rect = fab.getBoundingClientRect();
+        fabDrag = { startY: e.clientY, startBottom: window.innerHeight - rect.bottom };
+        e.preventDefault();
       })
     );
-    fab.addEventListener('click', safe(openDialog));
+
+    document.addEventListener(
+      'mousemove',
+      safe(function (e) {
+        if (!fabDrag) return;
+        var dy = fabDrag.startY - e.clientY; // dragging up increases bottom
+        if (!fabWasDragged && Math.abs(dy) > 4) {
+          fabWasDragged = true;
+          fab.classList.add('it-dragging');
+        }
+        if (fabWasDragged) fab.style.bottom = clampBottom(fabDrag.startBottom + dy) + 'px';
+      })
+    );
+
+    document.addEventListener(
+      'mouseup',
+      safe(function () {
+        if (!fabDrag) return;
+        fabDrag = null;
+        if (fabWasDragged) {
+          fab.classList.remove('it-dragging');
+          try {
+            window.localStorage.setItem(FAB_POS_KEY, String(parseFloat(fab.style.bottom)));
+          } catch (_) {}
+        }
+      })
+    );
+
+    fab.addEventListener(
+      'click',
+      safe(function () {
+        // Swallow the click that ends a drag; a real click opens the dialog.
+        if (fabWasDragged) {
+          fabWasDragged = false;
+          return;
+        }
+        openDialog();
+      })
+    );
     document.body.appendChild(fab);
   });
 

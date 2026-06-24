@@ -5,7 +5,7 @@ import { JSDOM } from 'jsdom';
 
 const WIDGET_SRC = fs.readFileSync(new URL('../public/widget.js', import.meta.url), 'utf8');
 
-function loadWidget({ project = 'platform', fetchImpl } = {}) {
+function loadWidget({ project = 'platform', fetchImpl, beforeEval } = {}) {
   const dom = new JSDOM(
     '<!doctype html><html><body><h1>Host app</h1><button id="host-btn" data-x="1">Save</button></body></html>',
     { url: 'http://localhost:4556/page?tab=main', runScripts: 'outside-only', pretendToBeVisual: true }
@@ -22,6 +22,7 @@ function loadWidget({ project = 'platform', fetchImpl } = {}) {
   tag.src = 'http://localhost:4400/widget.js';
   tag.setAttribute('data-project', project);
   window.document.body.appendChild(tag);
+  if (beforeEval) beforeEval(window);
   window.eval(WIDGET_SRC);
   return { window, document: window.document, calls };
 }
@@ -46,6 +47,30 @@ test('loading the widget renders the FAB', () => {
   const fab = document.querySelector('.it-fab');
   assert.ok(fab, 'FAB should exist');
   assert.ok(document.querySelector('style[data-issue-tracker]'), 'styles injected');
+});
+
+test('the FAB drags vertically and suppresses the dialog; a plain click still opens it', () => {
+  const { window, document } = loadWidget();
+  const fab = document.querySelector('.it-fab');
+  const md = (clientY) => fab.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true, clientY }));
+  const move = (clientY) => document.dispatchEvent(new window.MouseEvent('mousemove', { bubbles: true, clientY }));
+  const up = () => document.dispatchEvent(new window.MouseEvent('mouseup', { bubbles: true }));
+  const click = () => fab.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+
+  // Drag upward past the threshold, then the click that ends the drag.
+  md(500); move(490); move(360); up(); click();
+  assert.equal(document.querySelector('.it-dialog'), null, 'a drag does not open the dialog');
+  assert.ok(fab.style.bottom, 'a vertical position was applied');
+  assert.ok(window.localStorage.getItem('itFabBottom'), 'the position was persisted');
+
+  // A plain click (no movement) still opens the dialog.
+  md(300); up(); click();
+  assert.ok(document.querySelector('.it-dialog'), 'a plain click opens the dialog');
+});
+
+test('the FAB restores its saved vertical position on load', () => {
+  const { document } = loadWidget({ beforeEval: (win) => win.localStorage.setItem('itFabBottom', '200') });
+  assert.equal(document.querySelector('.it-fab').style.bottom, '200px');
 });
 
 test('widget aborts politely without data-project', () => {
