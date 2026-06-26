@@ -11,12 +11,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Icebox.** Park a backlog item off the board and bring it back to the Backlog
   when you're ready, via a new Board / Icebox / Archive view toggle, a
   "Send to Icebox" button in the drawer, and a "Bring back" action in the icebox.
-  Iceboxed items also drop off agents' `list_issues`.
+  Iceboxed items drop off the board and off agents' `list_issues`.
+- Agents can park and revive issues through the new `icebox_issue` and
+  `revive_issue` MCP tools, and the agent doctrine now explains the icebox.
 - Draggable capture-widget button (drag it up or down; the position is remembered).
 
 ### Changed
 
 - The Archive view now explains that its items were swept from the Done column.
+
+### Fixed
+
+- The board no longer snaps a scrolled column back to the top on the 5s refresh.
 
 ## [0.1.0] Initial public release
 
