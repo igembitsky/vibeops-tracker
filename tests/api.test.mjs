@@ -205,6 +205,51 @@ test('sweep moves done issues to the archive; closed list serves them', async ()
   assert.match((await json(patch)).error, /closed/i);
 });
 
+test('icebox: park a backlog issue, list it, revive it; non-backlog is refused', async () => {
+  const created = await (await fetch(`${base}/api/issues`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ project: 'demo', title: 'park via api', seeing: 's', expecting: 'e' }),
+  })).json();
+  const id = created.id;
+
+  const iced = await fetch(`${base}/api/issues/${id}/icebox`, { method: 'POST' });
+  assert.equal(iced.status, 200);
+  assert.ok((await json(iced)).iceboxed);
+
+  const board = await (await fetch(`${base}/api/projects/demo/issues`)).json();
+  assert.ok(!board.some((i) => i.id === id), 'parked item is off the board');
+  const box = await (await fetch(`${base}/api/projects/demo/icebox`)).json();
+  assert.ok(box.some((i) => i.id === id), 'parked item is in the icebox list');
+
+  // iceboxed items reject board mutations
+  const patch = await fetch(`${base}/api/issues/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: 'x' }),
+  });
+  assert.equal(patch.status, 409);
+  assert.match((await json(patch)).error, /icebox/i);
+
+  const revived = await fetch(`${base}/api/issues/${id}/revive`, { method: 'POST' });
+  assert.equal(revived.status, 200);
+  const revivedIssue = await json(revived);
+  assert.equal(revivedIssue.status, 'backlog');
+  assert.equal(revivedIssue.iceboxed, null);
+  const board2 = await (await fetch(`${base}/api/projects/demo/issues`)).json();
+  assert.ok(board2.some((i) => i.id === id), 'revived item is back on the board');
+
+  // a non-backlog issue cannot be iceboxed
+  await fetch(`${base}/api/issues/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'in-progress' }),
+  });
+  const bad = await fetch(`${base}/api/issues/${id}/icebox`, { method: 'POST' });
+  assert.equal(bad.status, 400);
+  assert.match((await json(bad)).error, /backlog/i);
+});
+
 test('project upsert stores repo_path and prompt uses it', async () => {
   const res = await fetch(`${base}/api/projects`, {
     method: 'POST',

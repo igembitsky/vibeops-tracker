@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Icebox.** Park a backlog item off the board and bring it back to the Backlog
+  when you're ready, via a new Board / Icebox / Archive view toggle, a
+  "Send to Icebox" button in the drawer, and a "Bring back" action in the icebox.
+  Iceboxed items also drop off agents' `list_issues`.
+- Draggable capture-widget button (drag it up or down; the position is remembered).
+
+### Changed
+
+- The Archive view now explains that its items were swept from the Done column.
+
 ## [0.1.0] Initial public release
 
 The first open-source release of VibeOps Tracker, a local-first issue tracker.

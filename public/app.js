@@ -16,7 +16,8 @@
     projectKey: localStorage.getItem('it-project') || null,
     issues: [],
     closed: [],
-    view: 'board', // board | archive
+    icebox: [],
+    view: 'board', // board | icebox | archive
     query: '',
     draggingId: null,
     drawerId: null,
@@ -30,6 +31,7 @@
   const $backdrop = document.getElementById('drawer-backdrop');
   const $modalRoot = document.getElementById('modal-root');
   const $viewBoard = document.getElementById('view-board');
+  const $viewIcebox = document.getElementById('view-icebox');
   const $viewArchive = document.getElementById('view-archive');
 
   function el(tag, cls, text) {
@@ -98,11 +100,13 @@
   });
 
   $viewBoard.addEventListener('click', () => setView('board'));
+  $viewIcebox.addEventListener('click', () => setView('icebox'));
   $viewArchive.addEventListener('click', () => setView('archive'));
 
   function setView(view) {
     state.view = view;
     $viewBoard.classList.toggle('on', view === 'board');
+    $viewIcebox.classList.toggle('on', view === 'icebox');
     $viewArchive.classList.toggle('on', view === 'archive');
     refresh();
   }
@@ -116,6 +120,8 @@
     }
     if (state.view === 'board') {
       state.issues = await api(`/api/projects/${encodeURIComponent(state.projectKey)}/issues`);
+    } else if (state.view === 'icebox') {
+      state.icebox = await api(`/api/projects/${encodeURIComponent(state.projectKey)}/icebox`);
     } else {
       state.closed = await api(`/api/projects/${encodeURIComponent(state.projectKey)}/closed`);
     }
@@ -128,6 +134,7 @@
       return;
     }
     if (state.view === 'board') renderBoard();
+    else if (state.view === 'icebox') renderIcebox();
     else renderArchive();
   }
 
@@ -223,6 +230,7 @@
     $count.textContent = `${visible.length} archived issue${visible.length === 1 ? '' : 's'}`;
     $board.className = 'archive';
     $board.replaceChildren();
+    $board.appendChild(el('p', 'view-note', "These issues were swept from the Done column. They're kept here as a read-only history of finished work."));
     if (!visible.length) {
       $board.appendChild(el('div', 'hint', state.query ? 'No archived issues match the search.' : 'Nothing swept yet. Use “Sweep” on the Done column to archive finished issues.'));
       return;
@@ -236,6 +244,46 @@
       meta.appendChild(el('span', `pill pill-type-${issue.type}`, issue.type));
       meta.appendChild(el('span', `pill pill-sev pill-sev-${issue.severity}`, `S${issue.severity}`));
       meta.appendChild(el('span', 'card-age', `closed ${issue.closed ? new Date(issue.closed).toLocaleDateString() : ''}`));
+      row.appendChild(meta);
+      row.addEventListener('click', () => openDrawer(issue.id));
+      list.appendChild(row);
+    }
+    $board.appendChild(list);
+  }
+
+  function renderIcebox() {
+    const visible = state.icebox.filter((i) => matchesQuery(i, state.query));
+    $count.textContent = `${visible.length} iceboxed issue${visible.length === 1 ? '' : 's'}`;
+    $board.className = 'archive';
+    $board.replaceChildren();
+    $board.appendChild(el('p', 'view-note', "Parked backlog items, off the board and out of agents' reach. Bring one back to the Backlog whenever you're ready."));
+    if (!visible.length) {
+      $board.appendChild(el('div', 'hint', state.query ? 'No iceboxed issues match the search.' : 'The icebox is empty. Open a backlog issue and use “Send to Icebox” to park it for later.'));
+      return;
+    }
+    const list = el('div', 'archive-list');
+    for (const issue of visible) {
+      const row = el('div', 'archive-row');
+      row.appendChild(el('span', 'card-id', issue.id));
+      row.appendChild(el('span', 'archive-title', issue.title || (issue.seeing || '').slice(0, 80) || '(untitled)'));
+      const meta = el('span', 'card-meta');
+      meta.appendChild(el('span', `pill pill-type-${issue.type}`, issue.type));
+      meta.appendChild(el('span', `pill pill-sev pill-sev-${issue.severity}`, `S${issue.severity}`));
+      meta.appendChild(el('span', 'card-age', `iced ${issue.iceboxed ? new Date(issue.iceboxed).toLocaleDateString() : ''}`));
+      const back = el('button', 'btn revive-btn', '↑ Backlog');
+      back.title = 'Bring this item back to the board (Backlog)';
+      back.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        back.disabled = true;
+        try {
+          await api(`/api/issues/${encodeURIComponent(issue.id)}/revive`, { method: 'POST' });
+          refresh();
+        } catch (err) {
+          back.disabled = false;
+          console.warn('revive failed', err);
+        }
+      });
+      meta.appendChild(back);
       row.appendChild(meta);
       row.addEventListener('click', () => openDrawer(issue.id));
       list.appendChild(row);
@@ -322,7 +370,7 @@
     } catch {
       return;
     }
-    const readOnly = !!issue.closed;
+    const readOnly = !!issue.closed || !!issue.iceboxed;
     state.drawerId = id;
     history.replaceState(null, '', `#${encodeURIComponent(id)}`);
     $drawer.replaceChildren();
@@ -387,7 +435,8 @@
     for (const tag of issue.tags || []) meta.appendChild(el('span', 'tag', tag));
     meta.appendChild(el('span', 'card-age', `created ${relAge(issue.created)} ago`));
     if (issue.relatedTo) meta.appendChild(el('span', 'tag', `related: ${issue.relatedTo}`));
-    if (readOnly) meta.appendChild(el('span', 'pill pill-closed', `archived ${new Date(issue.closed).toLocaleDateString()}`));
+    if (issue.closed) meta.appendChild(el('span', 'pill pill-closed', `archived ${new Date(issue.closed).toLocaleDateString()}`));
+    else if (issue.iceboxed) meta.appendChild(el('span', 'pill pill-iceboxed', `iceboxed ${new Date(issue.iceboxed).toLocaleDateString()}`));
     $drawer.appendChild(meta);
 
     const actions = el('div', 'drawer-actions');
@@ -428,6 +477,37 @@
       setTimeout(() => (copyBtn.textContent = 'Copy Prompt'), 1800);
     });
     actions.appendChild(copyBtn);
+
+    if (issue.iceboxed) {
+      const reviveBtn = el('button', 'btn btn-primary', '↑ Bring back to board');
+      reviveBtn.addEventListener('click', async () => {
+        reviveBtn.disabled = true;
+        try {
+          await api(`/api/issues/${encodeURIComponent(issue.id)}/revive`, { method: 'POST' });
+          closeDrawer();
+          refresh();
+        } catch (err) {
+          reviveBtn.disabled = false;
+          console.warn('revive failed', err);
+        }
+      });
+      actions.appendChild(reviveBtn);
+    } else if (!readOnly && issue.status === 'backlog') {
+      const iceboxBtn = el('button', 'btn', 'Send to Icebox');
+      iceboxBtn.title = 'Park this backlog item off the board; bring it back any time';
+      iceboxBtn.addEventListener('click', async () => {
+        iceboxBtn.disabled = true;
+        try {
+          await api(`/api/issues/${encodeURIComponent(issue.id)}/icebox`, { method: 'POST' });
+          closeDrawer();
+          refresh();
+        } catch (err) {
+          iceboxBtn.disabled = false;
+          console.warn('icebox failed', err);
+        }
+      });
+      actions.appendChild(iceboxBtn);
+    }
     $drawer.appendChild(actions);
 
     const seeing = el('div', 'section');

@@ -102,6 +102,13 @@ body {
 .archive-row .card-meta { margin-left: auto; flex-shrink: 0; }
 
 .pill-closed { background: #374151; color: #d1d5db; }
+.pill-iceboxed { background: #155e75; color: #cffafe; }
+
+/* Explanatory note at the top of the Archive and Icebox views. */
+.view-note { color: var(--muted); font-size: 13px; line-height: 1.5; max-width: 860px; margin: 0 auto 14px; }
+
+/* "Bring back" button on icebox rows. */
+.revive-btn { padding: 3px 11px; font-size: 12px; margin-left: 4px; white-space: nowrap; }
 
 .section-resolution .prose { border-left: 3px solid #14532d; }
 .modified-files { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }

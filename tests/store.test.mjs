@@ -17,6 +17,9 @@ import {
   listClosed,
   searchIssues,
   deleteIssue,
+  iceboxIssue,
+  reviveIssue,
+  listIcebox,
 } from '../lib/store.mjs';
 
 function tmpDataDir() {
@@ -348,6 +351,55 @@ test('deleteIssue cannot escape the data dir via a traversal id', () => {
   assert.throws(() => deleteIssue(dir, `${rel}`), (err) => err.code === 'NOT_FOUND');
   assert.throws(() => deleteIssue(dir, '../../../etc/passwd-1'), (err) => err.code === 'NOT_FOUND');
   assert.ok(fs.existsSync(planted), 'file outside the data dir is never touched');
+});
+
+test('iceboxIssue parks a backlog item; reviveIssue returns it to the backlog bottom', () => {
+  const dir = tmpDataDir();
+  const a = createIssue(dir, { project: 'p', title: 'park me', seeing: 's', expecting: 'e' });
+  const b = createIssue(dir, { project: 'p', title: 'keep', seeing: 's', expecting: 'e' });
+
+  const iced = iceboxIssue(dir, a.id);
+  assert.ok(iced.iceboxed, 'iceboxed timestamp set');
+  assert.equal(iced.status, 'backlog', 'status preserved while parked');
+
+  // gone from the board, present in the icebox, still retrievable by id
+  assert.deepEqual(listIssues(dir, 'p').map((i) => i.id), [b.id]);
+  assert.deepEqual(listIcebox(dir, 'p').map((i) => i.id), [a.id]);
+  assert.ok(getIssue(dir, a.id).iceboxed, 'getIssue finds it and flags it iceboxed');
+
+  // iceboxed items reject board mutations until revived
+  assert.throws(() => updateIssue(dir, a.id, { title: 'x' }), (e) => e.code === 'ICEBOXED');
+  assert.throws(() => addComment(dir, a.id, { author: 'x', text: 'y' }), (e) => e.code === 'ICEBOXED');
+
+  const revived = reviveIssue(dir, a.id);
+  assert.equal(revived.status, 'backlog');
+  assert.equal(revived.iceboxed, null, 'iceboxed cleared on revive');
+  assert.deepEqual(listIcebox(dir, 'p'), []);
+  assert.deepEqual(
+    listIssues(dir, 'p', { status: 'backlog' }).map((i) => i.id),
+    [b.id, a.id],
+    'revived item lands at the bottom of the backlog'
+  );
+});
+
+test('only backlog issues can be iceboxed', () => {
+  const dir = tmpDataDir();
+  const a = createIssue(dir, { project: 'p', seeing: 's', expecting: 'e' });
+  updateIssue(dir, a.id, { status: 'in-progress' });
+  assert.throws(() => iceboxIssue(dir, a.id), /Only backlog issues/);
+
+  const b = createIssue(dir, { project: 'p', seeing: 's', expecting: 'e' });
+  updateIssue(dir, b.id, { status: 'done' });
+  sweepDone(dir, 'p');
+  assert.throws(() => iceboxIssue(dir, b.id), (e) => e.code === 'CLOSED');
+});
+
+test('iceboxed ids are never reused by createIssue', () => {
+  const dir = tmpDataDir();
+  const a = createIssue(dir, { project: 'p', seeing: 's', expecting: 'e' }); // p-1
+  iceboxIssue(dir, a.id);
+  const c = createIssue(dir, { project: 'p', seeing: 's', expecting: 'e' });
+  assert.equal(c.id, 'p-2', 'next id skips the parked p-1');
 });
 
 test('searchIssues matches across fields, optionally filtered and including closed', () => {

@@ -81,6 +81,8 @@ projects, with a switcher to move between them:
 - **Click to edit** an issue's type or severity right on the card detail.
 - **Sweep** finished work into a searchable **Archive**, and **delete** stale or
   test issues outright (with a two-step confirm).
+- **Icebox** a backlog item to park it off the board, then bring it back to the
+  Backlog when the time is right. Iceboxed items also drop off agents' `list_issues`.
 - **Copy Prompt** turns any issue into a paste-ready Claude Code prompt: the
   full description, the captured context, the repo path, and the workflow.
 
