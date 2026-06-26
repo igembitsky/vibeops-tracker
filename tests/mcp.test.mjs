@@ -58,9 +58,11 @@ test('mcp server speaks the protocol and round-trips issues', async (t) => {
     'delete_issue',
     'get_issue',
     'get_tracker_instructions',
+    'icebox_issue',
     'list_issues',
     'list_projects',
     'resolve_issue',
+    'revive_issue',
     'search_issues',
     'update_issue',
   ]);
@@ -116,6 +118,7 @@ test('mcp server speaks the protocol and round-trips issues', async (t) => {
   assert.match(doctrine, /in-progress/);
   assert.match(doctrine, /resolve_issue/);
   assert.match(doctrine, /never edit/i);
+  assert.match(doctrine, /icebox/i);
 
   const bad = await mcp.request('tools/call', { name: 'update_issue', arguments: { id: 'test-1', status: 'bogus' } });
   assert.equal(bad.result.isError, true);
@@ -124,6 +127,26 @@ test('mcp server speaks the protocol and round-trips issues', async (t) => {
   const missing = await mcp.request('tools/call', { name: 'get_issue', arguments: { id: 'test-999' } });
   assert.equal(missing.result.isError, true);
   assert.match(missing.result.content[0].text, /NOT_FOUND/);
+
+  // icebox round-trip: park a backlog issue (it drops off list_issues), then revive it
+  const parkable = JSON.parse(
+    (await mcp.request('tools/call', { name: 'create_issue', arguments: { project: 'test', title: 'park me', seeing: 's', expecting: 'e' } })).result.content[0].text
+  );
+  const parked = await mcp.request('tools/call', { name: 'icebox_issue', arguments: { id: parkable.id } });
+  assert.ok(!parked.result.isError, JSON.stringify(parked.result));
+  assert.ok(JSON.parse(parked.result.content[0].text).iceboxed, 'iceboxed timestamp set');
+  const backlogAfterPark = JSON.parse(
+    (await mcp.request('tools/call', { name: 'list_issues', arguments: { project: 'test', status: 'backlog' } })).result.content[0].text
+  );
+  assert.ok(!backlogAfterPark.some((i) => i.id === parkable.id), 'parked issue is hidden from list_issues');
+
+  const revivedMcp = await mcp.request('tools/call', { name: 'revive_issue', arguments: { id: parkable.id } });
+  assert.ok(!revivedMcp.result.isError, JSON.stringify(revivedMcp.result));
+  assert.equal(JSON.parse(revivedMcp.result.content[0].text).status, 'backlog');
+  const backlogAfterRevive = JSON.parse(
+    (await mcp.request('tools/call', { name: 'list_issues', arguments: { project: 'test', status: 'backlog' } })).result.content[0].text
+  );
+  assert.ok(backlogAfterRevive.some((i) => i.id === parkable.id), 'revived issue is back in list_issues');
 
   // delete_issue: refuses without confirm, then permanently removes
   const noConfirm = await mcp.request('tools/call', { name: 'delete_issue', arguments: { id: 'test-1' } });

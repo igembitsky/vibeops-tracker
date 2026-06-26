@@ -111,7 +111,7 @@ works even when the web UI isn't running.
 
 **Tools:** `get_tracker_instructions`, `list_projects`, `list_issues`,
 `search_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment`,
-`resolve_issue`, `delete_issue`.
+`resolve_issue`, `icebox_issue`, `revive_issue`, `delete_issue`.
 
 ## How it stores things
 

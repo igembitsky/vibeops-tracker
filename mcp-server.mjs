@@ -18,6 +18,8 @@ import {
   resolveIssue,
   searchIssues,
   deleteIssue,
+  iceboxIssue,
+  reviveIssue,
 } from './lib/store.mjs';
 import { resolveDataDir } from './lib/data-dir.mjs';
 
@@ -49,7 +51,10 @@ Workflow:
    moves it to done after verifying. Never set done yourself.
 6. File new issues you notice with create_issue (seeing/expecting required).
 
-Statuses: ${STATUSES.join(' | ')}. Severity 1 (cosmetic) to 5 (blocker).`;
+Statuses: ${STATUSES.join(' | ')}. Severity 1 (cosmetic) to 5 (blocker).
+The icebox parks deferred backlog items: they keep their content but are hidden from
+list_issues. Park a backlog item with icebox_issue {id} (backlog only) when it is not ready
+to build, and bring it back to the Backlog with revive_issue {id}.`;
 
 const TOOLS = [
   {
@@ -199,6 +204,29 @@ const TOOLS = [
       additionalProperties: false,
     },
     handler: ({ id, author, text }) => addComment(DATA_DIR, id, { author, text }),
+  },
+  {
+    name: 'icebox_issue',
+    description:
+      'Park a backlog issue in the icebox to defer it. Only backlog issues can be iceboxed. It keeps its content but drops off the board and off list_issues until revived. Use this for backlog items that are not ready to build yet.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', description: 'Issue id, e.g. "platform-3"' } },
+      required: ['id'],
+      additionalProperties: false,
+    },
+    handler: ({ id }) => iceboxIssue(DATA_DIR, id),
+  },
+  {
+    name: 'revive_issue',
+    description: 'Bring an iceboxed issue back onto the board, at the bottom of the Backlog column.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', description: 'Issue id, e.g. "platform-3"' } },
+      required: ['id'],
+      additionalProperties: false,
+    },
+    handler: ({ id }) => reviveIssue(DATA_DIR, id),
   },
   {
     name: 'delete_issue',
