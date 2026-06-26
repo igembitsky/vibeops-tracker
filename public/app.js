@@ -153,6 +153,10 @@
   function renderBoard() {
     if (state.draggingId) return; // never re-render mid-drag
     const visible = state.issues.filter((i) => matchesQuery(i, state.query));
+    // Preserve each column's scroll position across the re-render. The 5s poll
+    // re-renders the board, which would otherwise snap a scrolled column to top.
+    const scrolls = {};
+    $board.querySelectorAll('.col-cards').forEach((c) => { scrolls[c.dataset.status] = c.scrollTop; });
     $count.textContent = state.query
       ? `${visible.length} of ${state.issues.length} issue${state.issues.length === 1 ? '' : 's'}`
       : `${state.issues.length} issue${state.issues.length === 1 ? '' : 's'}`;
@@ -188,6 +192,9 @@
       col.appendChild(list);
       $board.appendChild(col);
     }
+    $board.querySelectorAll('.col-cards').forEach((c) => {
+      if (scrolls[c.dataset.status] != null) c.scrollTop = scrolls[c.dataset.status];
+    });
   }
 
   function renderCard(issue) {
