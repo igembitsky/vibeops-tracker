@@ -150,7 +150,7 @@ To disable temporarily instead of removing, comment the tag out. Make no other c
     <h3>Pick up the next ticket and work it</h3>
     <pre class="prompt"><code>You have access to my issue tracker via the issue-tracker MCP server. Call
 get_tracker_instructions first, then list_issues for project "&lt;project-key&gt;" with status
-"backlog" and pick the FIRST one (it's the highest priority). Read it fully with get_issue,
+"on-deck" and pick the FIRST one (it's the highest priority). Read it fully with get_issue,
 reproduce from the captured context, mark it in-progress, fix it, and finish with
 resolve_issue (resolution summary + modified files). Then stop for my review. Do not pick
 up another ticket unless I say so.</code></pre>
@@ -197,8 +197,9 @@ Do not start working on any of the issues.</code></pre>
         then <strong>Bring back</strong> from the Icebox view to return it to the Backlog. Iceboxed items also
         drop off agents' <code>list_issues</code>. The <strong>Archive</strong> is different: a read-only
         history of work you swept from Done.</li>
-      <li><strong>Statuses:</strong> backlog → in-progress → in-review → done. Agents never set
-        <em>done</em>; that's your verification step.</li>
+      <li><strong>Statuses:</strong> backlog → on-deck → in-progress → in-review → done. Backlog
+        is your triage pool; promote items to <strong>On Deck</strong>, the queue agents pull from.
+        Agents never set <em>done</em>; that's your verification step.</li>
       <li><strong>localhost-only by design.</strong> The API has no auth and allows any origin, so don't
         expose port 4400 beyond your machine.</li>
     </ul>

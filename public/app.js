@@ -4,6 +4,7 @@
 
   const STATUSES = [
     { key: 'backlog', label: 'Backlog' },
+    { key: 'on-deck', label: 'On Deck' },
     { key: 'in-progress', label: 'In Progress' },
     { key: 'in-review', label: 'In Review' },
     { key: 'done', label: 'Done' },

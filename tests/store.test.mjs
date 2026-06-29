@@ -27,7 +27,18 @@ function tmpDataDir() {
 }
 
 test('STATUSES exposes the workflow in order', () => {
-  assert.deepEqual(STATUSES, ['backlog', 'in-progress', 'in-review', 'done']);
+  assert.deepEqual(STATUSES, ['backlog', 'on-deck', 'in-progress', 'in-review', 'done']);
+});
+
+test('on-deck sits between backlog and in-progress in priority order', () => {
+  const dir = tmpDataDir();
+  const a = createIssue(dir, { project: 'p', title: 'a', seeing: 's', expecting: 'e' }); // backlog
+  const b = createIssue(dir, { project: 'p', title: 'b', seeing: 's', expecting: 'e' });
+  const c = createIssue(dir, { project: 'p', title: 'c', seeing: 's', expecting: 'e' });
+  updateIssue(dir, b.id, { status: 'on-deck' });
+  updateIssue(dir, c.id, { status: 'in-progress' });
+  assert.equal(getIssue(dir, b.id).status, 'on-deck', 'on-deck is a valid status');
+  assert.deepEqual(listIssues(dir, 'p').map((i) => i.id), [a.id, b.id, c.id], 'backlog, then on-deck, then in-progress');
 });
 
 test('ensureProject creates registry entries; explicit name upserts', () => {

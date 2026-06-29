@@ -170,7 +170,9 @@ body {
 
 #board {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* One equal track per status column; adapts to however many STATUSES exist. */
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: 14px;
   padding: 16px 20px;
   align-items: start;

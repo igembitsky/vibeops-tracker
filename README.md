@@ -74,7 +74,8 @@ no widget required.
 Open `http://localhost:4400` and you get a Kanban board across all your
 projects, with a switcher to move between them:
 
-- **Four columns:** Backlog → In Progress → In Review → Done.
+- **Five columns:** Backlog → On Deck → In Progress → In Review → Done. Backlog is
+  your triage pool; promote items to **On Deck**, the curated queue agents pull from.
 - **Drag to prioritize.** Card order is saved to each issue's file, so agents
   see the same priority you do.
 - **Real-time search** filters cards as you type.
@@ -97,10 +98,9 @@ claude mcp add vibeops -- npx -y -p vibeops-tracker vibeops-mcp
 
 Now your agents can read and drive the board directly. The intended loop:
 
-1. You stack and prioritize a backlog during the day.
-2. When you step away, you point an agent at it: *"Work the top items in the
-   `my-app` backlog and stop for my review."*
-3. The agent calls `list_issues`, picks the highest-priority one, marks it
+1. You triage the backlog during the day and promote the items you want worked to **On Deck**.
+2. When you step away, you point an agent at it: *"Work my-app's On Deck and stop for my review."*
+3. The agent calls `list_issues` for On Deck, picks the highest-priority one, marks it
    **In Progress**, does the work, and moves it to **In Review** with a
    summary of what it changed and which files it touched.
 4. You come back to a board that shows exactly what got done, ready to verify.

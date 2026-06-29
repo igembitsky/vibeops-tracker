@@ -8,6 +8,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **On Deck column.** A curated, prioritized queue between Backlog and In Progress.
+  Backlog is now your triage pool; you promote items to On Deck for agents to pick up.
+  Agents pull work from On Deck (not Backlog), per the updated MCP doctrine.
 - **Icebox.** Park a backlog item off the board and bring it back to the Backlog
   when you're ready, via a new Board / Icebox / Archive view toggle, a
   "Send to Icebox" button in the drawer, and a "Bring back" action in the icebox.

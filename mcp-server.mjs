@@ -40,10 +40,13 @@ add_comment. Never move an issue to done yourself, since a human verifies in-rev
 
 Workflow:
 1. search_issues first when filing, so you avoid duplicates; link regressions with related_to.
-2. To pick up work: list_issues {project, status: "backlog"}. The FIRST result is the
-   highest-priority item. Read it fully with get_issue; the captured ## Context
-   (URL, clicks, fetches, JS errors, capture-time git state) usually localizes the bug.
-   Capture-time branch/worktree info may be stale, so verify against the repo's current state.
+2. To pick up work: list_issues {project, status: "on-deck"}. On Deck is the human-curated,
+   prioritized queue of work ready for agents; the FIRST result is the highest priority. Do NOT
+   pull from Backlog (that is the human's triage pool), and never move issues into on-deck
+   yourself; a human promotes Backlog to On Deck. Read the chosen issue fully with get_issue;
+   the captured ## Context (URL, clicks, fetches, JS errors, capture-time git state) usually
+   localizes the bug. Capture-time branch/worktree info may be stale, so verify against the
+   repo's current state.
 3. Before coding: update_issue {id, status: "in-progress"}. Reproduce from context first.
 4. Leave add_comment notes (author: "claude") for anything notable mid-work.
 5. Finish with resolve_issue {id, resolution, modified_files}, a PR-style summary of
@@ -66,7 +69,7 @@ const TOOLS = [
   {
     name: 'list_issues',
     description:
-      'List issues for a project, priority-ordered (by status, then board position). Optionally filter by status. Statuses: backlog, in-progress, in-review, done. The first backlog issue is the highest-priority unstarted work. The captured browser context is omitted for brevity (hasContext flags it); call get_issue for the full snapshot.',
+      'List issues for a project, priority-ordered (by status, then board position). Optionally filter by status. Statuses: backlog, on-deck, in-progress, in-review, done. Agents pull work from on-deck (the human-curated ready queue); the first on-deck issue is the highest priority. Backlog is the human triage pool, not the agent queue. The captured browser context is omitted for brevity (hasContext flags it); call get_issue for the full snapshot.',
     inputSchema: {
       type: 'object',
       properties: {
