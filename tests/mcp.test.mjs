@@ -120,6 +120,8 @@ test('mcp server speaks the protocol and round-trips issues', async (t) => {
   assert.match(doctrine, /never edit/i);
   assert.match(doctrine, /icebox/i);
   assert.match(doctrine, /on-deck/i);
+  assert.match(doctrine, /widget\.js/);
+  assert.match(doctrine, /data-project/);
 
   const bad = await mcp.request('tools/call', { name: 'update_issue', arguments: { id: 'test-1', status: 'bogus' } });
   assert.equal(bad.result.isError, true);

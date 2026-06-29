@@ -57,7 +57,19 @@ Workflow:
 Statuses: ${STATUSES.join(' | ')}. Severity 1 (cosmetic) to 5 (blocker).
 The icebox parks deferred backlog items: they keep their content but are hidden from
 list_issues. Park a backlog item with icebox_issue {id} (backlog only) when it is not ready
-to build, and bring it back to the Backlog with revive_issue {id}.`;
+to build, and bring it back to the Backlog with revive_issue {id}.
+
+Adding the capture widget to an app (a dashboard, a worktree build, any web UI) so it can file
+issues here: add ONE script tag to the app's HTML, ideally a shared layout and guarded to dev
+so it never ships to production:
+  <script src="${API_BASE}/widget.js" data-project="<project-key>" defer></script>
+Use that exact absolute src. The widget posts to wherever it was loaded from, so the app's own
+host/port does not matter and every instance reports to this tracker. Do not reimplement or
+inline the widget; the single tag is the whole integration. Choose <project-key> deliberately:
+reuse an existing key (call list_projects) to file into that project, or pick a new stable key,
+which auto-registers on first capture. Apps and git worktrees that share the same key and src
+all file into the same project. Example dev guard: only inject the tag when location.hostname
+=== "localhost".`;
 
 const TOOLS = [
   {

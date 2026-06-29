@@ -22,6 +22,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - The Archive view now explains that its items were swept from the Done column.
+- The agent doctrine (`get_tracker_instructions`) now explains how to install the
+  capture widget into an app and route it to a project.
 
 ### Fixed
 
