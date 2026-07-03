@@ -52,7 +52,14 @@ Workflow:
 5. Finish with resolve_issue {id, resolution, modified_files}, a PR-style summary of
    what changed, why, and how it was tested. This sets status to in-review; a HUMAN
    moves it to done after verifying. Never set done yourself.
-6. File new issues you notice with create_issue (seeing/expecting required).
+6. After resolving, run a brief capture retrospective: which captured context fields did
+   you actually use, what did you have to reconstruct by hand that the widget could have
+   captured, and what captured context was noise? If that yields a concrete improvement
+   to this project's widget integration (usually a field to add to its configure()
+   context; see below), recommend it to the human in your final report. Never file the
+   recommendation as an issue; the human files it if they adopt it. No recommendation,
+   no mention.
+7. File new issues you notice with create_issue (seeing/expecting required).
 
 Statuses: ${STATUSES.join(' | ')}. Severity 1 (cosmetic) to 5 (blocker).
 The icebox parks deferred backlog items: they keep their content but are hidden from
@@ -65,11 +72,28 @@ so it never ships to production:
   <script src="${API_BASE}/widget.js" data-project="<project-key>" defer></script>
 Use that exact absolute src. The widget posts to wherever it was loaded from, so the app's own
 host/port does not matter and every instance reports to this tracker. Do not reimplement or
-inline the widget; the single tag is the whole integration. Choose <project-key> deliberately:
-reuse an existing key (call list_projects) to file into that project, or pick a new stable key,
-which auto-registers on first capture. Apps and git worktrees that share the same key and src
-all file into the same project. Example dev guard: only inject the tag when location.hostname
-=== "localhost".`;
+inline the widget; the tag is the whole install, optionally enriched via configure (below).
+Choose <project-key> deliberately: reuse an existing key (call list_projects) to file into that
+project, or pick a new stable key, which auto-registers on first capture. Apps and git worktrees
+that share the same key and src all file into the same project. Example dev guard: only inject
+the tag when location.hostname === "localhost".
+
+Enriching captures (optional): the widget snapshots the URL, viewport, and activity trail on
+its own, but it cannot see app state. The host app can add that:
+  <script>
+    addEventListener('DOMContentLoaded', () =>
+      window.IssueTracker?.configure({ context: () => ({ /* small JSON */ }) }));
+  </script>
+The DOMContentLoaded wrapper matters: the widget tag is deferred, so a bare inline configure
+call would run before window.IssueTracker exists and throw. The context function itself runs
+at capture time and its result lands in the issue's ## Context. What is worth
+capturing is a judgment call per project; the usual candidates:
+- App state the URL does not carry: active view/tab, open modal or wizard step, selected record id.
+- Signed-in identity or tenant: a user id or role, never credentials.
+- Data shape: counts and ids ("rows: 1204"), not the data itself.
+- Build provenance where the host can know it: git branch/commit/worktree, port or host.
+Keep it small: a few keys of JSON, pointers over payloads, and never secrets or PII. If the app
+has no state beyond its URL, the bare tag is enough.`;
 
 const TOOLS = [
   {

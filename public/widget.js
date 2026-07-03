@@ -1,6 +1,9 @@
 /* issue-tracker embeddable capture widget.
  * Install: <script src="http://localhost:4400/widget.js" data-project="<key>" defer></script>
- * Optional: window.IssueTracker.configure({ context: () => ({ ...appState }) })
+ * Optional: window.IssueTracker.configure({ context: () => ({...}) }) enriches captures
+ * with app state the widget cannot see: active view/tab/modal, user or tenant id, data
+ * counts, git branch/commit/worktree, port. Small JSON only; pointers, not dumps; never
+ * secrets or PII.
  * The widget must never break the host app: every entry point is wrapped.
  */
 (function () {

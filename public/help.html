@@ -74,13 +74,18 @@
     <p>3. <em>Optional:</em> enrich captures with app state and git info (handy for worktree workflows,
     since captures then record which branch/worktree they came from):</p>
     <pre><code>&lt;script&gt;
-  window.IssueTracker.configure({
-    context: () =&gt; ({
-      // anything useful: current tab, selected record, feature flags…
-      git: { branch: "...", commit: "...", worktree: "..." }  // if the host can know it
-    })
-  });
+  addEventListener("DOMContentLoaded", () =&gt;
+    window.IssueTracker?.configure({
+      context: () =&gt; ({
+        // anything useful: current tab, selected record, feature flags…
+        git: { branch: "...", commit: "...", worktree: "..." }  // if the host can know it
+      })
+    }));
 &lt;/script&gt;</code></pre>
+    <p class="note">The <code>DOMContentLoaded</code> wrapper matters: the widget tag is deferred,
+    so a bare inline call would run before <code>window.IssueTracker</code> exists. Keep the
+    context small: a few keys of JSON, pointers (ids, counts, names) rather than data dumps,
+    and never secrets or PII.</p>
 
     <h2 id="disable">Disable / Enable / Remove</h2>
     <h3>Disable temporarily</h3>
@@ -139,7 +144,8 @@
 to the main HTML page(s), choosing a short kebab-case project key. Then register the repo path:
 curl -X POST http://localhost:4400/api/projects -H 'Content-Type: application/json' -d '{"key": "&lt;project-key&gt;", "name": "&lt;Readable Name&gt;", "repo_path": "&lt;absolute repo path&gt;"}'
 If the app knows its own state (current view, record ids, git branch), also add a
-window.IssueTracker.configure({ context: () =&gt; ({...}) }) block to enrich captures.
+window.IssueTracker?.configure({ context: () =&gt; ({...}) }) block to enrich captures,
+wrapped in a DOMContentLoaded listener (the widget tag is deferred).
 Verify by loading the app and checking the 🐞 button appears bottom-right.</code></pre>
 
     <h3>Disable or remove the widget from this project</h3>

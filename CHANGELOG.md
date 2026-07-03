@@ -18,6 +18,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Agents can park and revive issues through the new `icebox_issue` and
   `revive_issue` MCP tools, and the agent doctrine now explains the icebox.
 - Draggable capture-widget button (drag it up or down; the position is remembered).
+- **Capture-context guidance.** The agent doctrine now documents
+  `window.IssueTracker.configure` with a general checklist of what's worth
+  capturing (app state the URL doesn't carry, identity/tenant, data counts,
+  build provenance) and anti-noise rules (small JSON, pointers not dumps, never
+  secrets or PII). Mirrored in the widget header, README, and Help page.
+- **Capture retrospective.** After resolving an issue, agents now evaluate which
+  captured context they used, what they had to reconstruct by hand, and what was
+  noise, and recommend any concrete integration tweak to the human in their
+  final report (never auto-filed as an issue).
 
 ### Changed
 
@@ -28,6 +37,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 
 - The board no longer snaps a scrolled column back to the top on the 5s refresh.
+- The Help page's `configure` example now waits for `DOMContentLoaded`: the widget
+  tag is deferred, so the old bare inline call ran before `window.IssueTracker`
+  existed and threw.
 
 ## [0.1.0] Initial public release
 

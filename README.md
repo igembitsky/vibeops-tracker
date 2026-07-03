@@ -60,6 +60,12 @@ snapshot: the URL, the viewport, and (for bugs) an activity trail of your last
 clicks, network calls, and JavaScript errors. The widget never breaks the host
 app: if the tracker is down, it fails quietly and keeps your typed text.
 
+Optionally, tell the widget about app state the URL doesn't carry (active tab,
+selected record id, git branch) with
+`window.IssueTracker.configure({ context: () => ({...}) })`; whatever the
+function returns at capture time is attached to the issue. Keep it to a few
+keys of JSON, pointers rather than data dumps, and never secrets or PII.
+
 ![Capturing from the widget](docs/screenshots/widget-dialog.png)
 
 **2. From a Claude Code session, over MCP.** Register the tracker once as an

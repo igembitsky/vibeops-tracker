@@ -122,6 +122,10 @@ test('mcp server speaks the protocol and round-trips issues', async (t) => {
   assert.match(doctrine, /on-deck/i);
   assert.match(doctrine, /widget\.js/);
   assert.match(doctrine, /data-project/);
+  assert.match(doctrine, /IssueTracker\?\.configure/);
+  assert.match(doctrine, /never secrets or PII/i);
+  assert.match(doctrine, /capture retrospective/i);
+  assert.match(doctrine, /Never file the\s+recommendation as an issue/);
 
   const bad = await mcp.request('tools/call', { name: 'update_issue', arguments: { id: 'test-1', status: 'bogus' } });
   assert.equal(bad.result.isError, true);
