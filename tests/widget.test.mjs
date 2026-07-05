@@ -260,6 +260,27 @@ test('toast renders server-provided issue id as text, never as HTML', async () =
   assert.ok(toast.textContent.includes('<img src=x onerror=alert(1)>'), 'id shown as literal text');
 });
 
+test('the capture toast copies an agent-ready reference for pasting to an agent', async () => {
+  const { window, document } = loadWidget({
+    fetchImpl: () => Promise.resolve({ ok: true, status: 201, json: async () => ({ id: 'platform-9', title: 'My bug' }) }),
+  });
+  let copied = null;
+  Object.defineProperty(window.navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText: (t) => { copied = t; return Promise.resolve(); } },
+  });
+  openDialog(document);
+  fillAndSubmit(document);
+  await tick();
+  await tick();
+  const cp = document.querySelector('.it-toast .it-copyref');
+  assert.ok(cp, 'copy-reference button in the toast');
+  assert.equal(cp.getAttribute('aria-label'), 'Copy issue reference');
+  cp.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+  await tick();
+  assert.equal(copied, 'VibeOps issue platform-9: "My bug"', 'copies the branded id + title reference');
+});
+
 test('highlighted text is previewed in the dialog and attached to the payload', async () => {
   const { window, document, calls } = loadWidget();
   window.getSelection = () => ({ toString: () => 'the broken label' });

@@ -229,6 +229,10 @@
     '.it-toast{position:fixed;right:18px;bottom:80px;background:#1f2937;color:#fff;padding:12px 16px;border-radius:10px;',
     'z-index:2147483003;box-shadow:0 8px 24px rgba(0,0,0,.3);font:13px/1.4 -apple-system,sans-serif;max-width:320px;}',
     '.it-toast a{color:#93c5fd;}',
+    '.it-copyref{display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;margin:0 3px;padding:2px;',
+    'border:none;background:transparent;color:#cbd5e1;cursor:pointer;border-radius:5px;line-height:0;}',
+    '.it-copyref:hover{color:#fff;background:rgba(255,255,255,.14);}',
+    '.it-copyref.it-copied{color:#34d399;}',
   ].join('');
 
   function injectStyles() {
@@ -292,8 +296,41 @@
     if (e.key === 'Escape') closeDialog();
   });
 
-  // All toast content is plain text or an explicit link, never HTML, so a
-  // compromised tracker response cannot inject markup into the host app.
+  // ---- icons + issue reference --------------------------------------------
+
+  var IT_SVG_NS = 'http://www.w3.org/2000/svg';
+  function svgNode(tag, attrs) {
+    var n = document.createElementNS(IT_SVG_NS, tag);
+    for (var k in attrs) if (Object.prototype.hasOwnProperty.call(attrs, k)) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+  function iconSvg(kids) {
+    var svg = svgNode('svg', {
+      viewBox: '0 0 24 24', width: '13', height: '13', fill: 'none', stroke: 'currentColor',
+      'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true',
+    });
+    for (var i = 0; i < kids.length; i++) svg.appendChild(kids[i]);
+    return svg;
+  }
+  function copyIcon() {
+    return iconSvg([
+      svgNode('rect', { x: '9', y: '9', width: '13', height: '13', rx: '2' }),
+      svgNode('path', { d: 'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1' }),
+    ]);
+  }
+  function checkIcon() {
+    return iconSvg([svgNode('path', { d: 'M20 6L9 17l-5-5' })]);
+  }
+
+  // Agent-ready reference, matching the board's copy button, so a pasted
+  // "VibeOps issue <id>" resolves via the tracker's MCP get_issue tool.
+  function issueRef(issue) {
+    var title = (issue.title || '').trim();
+    return 'VibeOps issue ' + issue.id + (title ? ': "' + title + '"' : '');
+  }
+
+  // Toast content is plain text, an explicit link, or a static copy control,
+  // never HTML from the tracker, so a compromised response cannot inject markup.
   function toast(parts, ms) {
     var t = el('div', 'it-toast');
     t.setAttribute('data-issue-tracker-ui', '1');
@@ -305,9 +342,31 @@
       a.rel = 'noopener';
       t.appendChild(a);
     }
+    if (parts.copyText) {
+      var cp = el('button', 'it-copyref');
+      cp.type = 'button';
+      cp.title = 'Copy a reference to paste to an agent';
+      cp.setAttribute('aria-label', 'Copy issue reference');
+      cp.appendChild(copyIcon());
+      cp.addEventListener('click', safe(function () {
+        if (!navigator.clipboard || !navigator.clipboard.writeText) return;
+        navigator.clipboard.writeText(parts.copyText).then(
+          safe(function () {
+            cp.replaceChildren(checkIcon());
+            cp.classList.add('it-copied');
+            setTimeout(safe(function () { cp.replaceChildren(copyIcon()); cp.classList.remove('it-copied'); }), 1400);
+          }),
+          function () {}
+        );
+      }));
+      t.appendChild(cp);
+    }
     if (parts.suffix) t.appendChild(document.createTextNode(parts.suffix));
     document.body.appendChild(t);
-    setTimeout(safe(function () { t.remove(); }), ms || 6000);
+    // Auto-dismiss, but pause while hovered so there is time to grab the reference.
+    var timer = setTimeout(safe(function () { t.remove(); }), ms || 6000);
+    t.addEventListener('mouseenter', function () { clearTimeout(timer); });
+    t.addEventListener('mouseleave', function () { timer = setTimeout(safe(function () { t.remove(); }), 2500); });
   }
 
   function openDialog() {
@@ -864,6 +923,7 @@
           toast({
             prefix: 'Issue ',
             link: { href: endpoint + '/#' + encodeURIComponent(issue.id), text: String(issue.id) },
+            copyText: issueRef(issue),
             suffix: ' captured.',
           });
         })

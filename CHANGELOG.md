@@ -39,6 +39,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   an agent-ready reference like `VibeOps issue platform-48: "Add a copy button"`.
   Paste it into a chat and say "work on \<paste\>": an agent with the VibeOps MCP
   server resolves the exact issue via `get_issue`. On cards it appears on hover.
+  The capture widget's success toast carries the same copy icon next to the new
+  issue's link, so you can file from any app and paste the reference straight to
+  an agent; the toast pauses its auto-dismiss while hovered.
 
 - **On Deck column.** A curated, prioritized queue between Backlog and In Progress.
   Backlog is now your triage pool; you promote items to On Deck for agents to pick up.
