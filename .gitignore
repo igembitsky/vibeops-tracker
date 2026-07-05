@@ -8,5 +8,10 @@ node_modules/
 data/*
 !data/.gitkeep
 
+# Local design artifacts (mockups, HTML sketches). Browsable via the design
+# browser (agent-os/design-browser), organized like docs/superpowers/specs,
+# but not versioned: they are working sketches, not source.
+docs/mockups/
+
 # Personal editor settings
 .vscode/
