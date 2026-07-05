@@ -60,13 +60,21 @@ Workflow:
 5. Finish with resolve_issue {id, resolution, modified_files}, a PR-style summary of
    what changed, why, and how it was tested. This sets status to in-review; a HUMAN
    moves it to done after verifying. Never set done yourself.
-6. After resolving, run a brief capture retrospective: which captured context fields did
-   you actually use, what did you have to reconstruct by hand that the widget could have
-   captured, and what captured context was noise? If that yields a concrete improvement
-   to this project's widget integration (usually a field to add to its configure()
-   context; see below), recommend it to the human in your final report. Never file the
-   recommendation as an issue; the human files it if they adopt it. No recommendation,
-   no mention.
+6. After resolving, run a brief capture retrospective and put it on the record:
+   (a) add_comment on the resolved issue (author: "claude"), plain product language,
+   exactly three parts: "What the capture solved" (the fields you actually used and what
+   each unlocked), "What we had to rebuild by hand" (what the widget could have captured
+   but did not), and "What was noise". End it with the ids of anything filed under (b).
+   (b) If the retro implies an improvement to the tracker itself (the widget, the capture
+   shape, these tools), file it with create_issue into the "vibeops" project: one issue
+   per improvement, type "improvement", tag "capture-retro" (always exactly that tag), a
+   title that states the problem in plain words. Write seeing as "What happened: ...
+   Consequence: ..." and expecting as "What should happen: ... Payoff: ...". It lands in
+   Backlog, the human triage pool; never promote it yourself.
+   An improvement to the HOST project's own widget integration (usually a configure()
+   context field; see below) is different: recommend it to the human in your final
+   report, never file it; the human files it if they adopt it. Nothing learned, no
+   comment, no mention.
 7. File new issues you notice with create_issue (seeing/expecting required).
 
 Statuses: ${STATUSES.join(' | ')}. Severity 1 (cosmetic) to 5 (blocker).
