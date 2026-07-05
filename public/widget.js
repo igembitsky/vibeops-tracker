@@ -177,6 +177,8 @@
     'max-height:88vh;overflow:auto;background:#fff;color:#111827;border-radius:12px;z-index:2147483002;',
     'box-shadow:0 20px 60px rgba(0,0,0,.35);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}',
     '.it-dialog *{box-sizing:border-box;font-family:inherit;}',
+    '@keyframes it-shake{10%,90%{transform:translate(-50%,-50%) translateX(-3px);}30%,70%{transform:translate(-50%,-50%) translateX(5px);}50%{transform:translate(-50%,-50%) translateX(-5px);}}',
+    '.it-shake{animation:it-shake .32s cubic-bezier(.36,.07,.19,.97);}',
     '.it-head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid #e5e7eb;cursor:move;}',
     '.it-head b{font-size:15px;}',
     '.it-body{padding:14px 16px;display:flex;flex-direction:column;gap:10px;}',
@@ -300,9 +302,33 @@
     var trail = null;
     var trailTouched = false;
 
+    // Guard the draft: a click on the backdrop (outside the dialog) must not
+    // discard a started report. An untouched, empty form still dismisses on an
+    // outside click; once anything is typed the dialog is sticky and closes
+    // only via ×, Cancel, or Escape. A brief shake makes that stickiness felt,
+    // so the no-op does not read as a frozen dialog.
+    function isDirty() {
+      return !!(
+        (title && title.value.trim()) ||
+        (seeing && seeing.value.trim()) ||
+        (expecting && expecting.value.trim()) ||
+        (tags && tags.value.trim())
+      );
+    }
+    function nudge() {
+      var d = ui.dialog;
+      if (!d) return;
+      d.classList.remove('it-shake');
+      void d.offsetWidth; // reflow so the shake replays on every stray click
+      d.classList.add('it-shake');
+    }
+
     ui.backdrop = el('div', 'it-backdrop');
     ui.backdrop.setAttribute('data-issue-tracker-ui', '1');
-    ui.backdrop.addEventListener('click', safe(closeDialog));
+    ui.backdrop.addEventListener('click', safe(function () {
+      if (isDirty()) { nudge(); return; }
+      closeDialog();
+    }));
     document.body.appendChild(ui.backdrop);
 
     var d = el('div', 'it-dialog');

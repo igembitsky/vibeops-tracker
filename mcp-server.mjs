@@ -26,12 +26,20 @@ import { resolveDataDir } from './lib/data-dir.mjs';
 const DATA_DIR = resolveDataDir();
 const API_BASE = process.env.TRACKER_URL || 'http://localhost:4400';
 
-const INSTRUCTIONS = `# Issue tracker: how agents should work with it
+const INSTRUCTIONS = `# VibeOps Tracker: how agents should work with it
 
-Issues are bug reports and feature requests captured from running apps (via an embedded
-widget with a browser context snapshot) or filed by humans and agents. One markdown
-file per issue lives under ${DATA_DIR}/<project>/issues/. NEVER edit those files directly.
-Always go through these MCP tools (or the REST API at ${API_BASE}/api).
+This is VibeOps Tracker, a local-first issue tracker. Issues are bug reports and feature
+requests captured from running apps (via an embedded widget with a browser context
+snapshot) or filed by humans and agents. One markdown file per issue lives under
+${DATA_DIR}/<project>/issues/. NEVER edit those files directly. Always go through these
+MCP tools (or the REST API at ${API_BASE}/api).
+
+Issue references: an issue id is <project>-<number>, e.g. platform-48. A human may paste a
+reference like \`VibeOps issue platform-48\` (or just \`platform-48\`, or with the title
+appended) and ask you to work on, analyze, or brainstorm it. That always denotes an issue
+in THIS tracker: pull the <project>-<number> id out of the reference, load the issue with
+get_issue {id}, and proceed per the workflow below. Do not treat it as a GitHub/Jira/Linear
+ticket.
 delete_issue permanently removes an issue (open or archived). It is IRREVERSIBLE. There
 is no archive copy, and it requires confirm:true. Reserve it for stale, test,
 duplicate, or clearly no-longer-relevant issues, and prefer to delete only when the
@@ -224,7 +232,7 @@ const TOOLS = [
   },
   {
     name: 'get_tracker_instructions',
-    description: 'How to work with this issue tracker: the expected agent workflow, status semantics, and rules. Call this once before interacting with issues.',
+    description: 'How to work with VibeOps Tracker (this issue tracker): the expected agent workflow, status semantics, how issue references like "VibeOps issue platform-48" map to get_issue, and the rules. Call this once before interacting with issues.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     handler: () => INSTRUCTIONS,
     raw: true,
@@ -288,7 +296,7 @@ const TOOLS = [
 ];
 
 const server = new Server(
-  { name: 'issue-tracker', version: '0.1.0' },
+  { name: 'vibeops-tracker', version: '0.1.0' },
   { capabilities: { tools: {} } }
 );
 

@@ -237,6 +237,34 @@ body {
 
 .card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .card-id { color: var(--muted); font-size: 12px; font-family: ui-monospace, monospace; }
+
+/* Copy-reference button next to a ticket id. */
+.copy-id {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 5px;
+  cursor: pointer;
+  line-height: 0;
+  transition: color .12s, background .12s, opacity .12s;
+}
+.copy-id:hover { color: var(--text); background: var(--panel-2); }
+.copy-id:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
+.copy-id.copied { color: #22c55e; }
+.copy-id.failed { color: var(--sev5); }
+/* On dense lists keep it out of the way until the row is hovered/focused. */
+.card .copy-id,
+.archive-row .copy-id { opacity: 0; }
+.card:hover .copy-id,
+.archive-row:hover .copy-id,
+.copy-id:focus-visible,
+.copy-id.copied,
+.copy-id.failed { opacity: 1; }
+.drawer-id-row { display: flex; align-items: center; gap: 6px; }
 .card-title { font-weight: 600; font-size: 14px; margin-bottom: 6px; overflow-wrap: anywhere; }
 .card-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 

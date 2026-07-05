@@ -42,6 +42,72 @@
     return node;
   }
 
+  // ---- copy-reference button ----------------------------------------------
+  // A one-click, agent-recognizable reference to a ticket. Pasting it into a
+  // chat with an agent that has the VibeOps MCP server lets it resolve the
+  // exact issue via get_issue {id}. "VibeOps" is the grounding word; the
+  // <project>-<n> id is what the MCP tools key off.
+
+  function issueRef(issue) {
+    const title = (issue.title || '').trim();
+    return title ? `VibeOps issue ${issue.id}: "${title}"` : `VibeOps issue ${issue.id}`;
+  }
+
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+
+  function svgIcon(children) {
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    for (const [k, v] of Object.entries({
+      viewBox: '0 0 24 24', width: '13', height: '13', fill: 'none',
+      stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round',
+      'stroke-linejoin': 'round', 'aria-hidden': 'true',
+    })) svg.setAttribute(k, v);
+    for (const c of children) svg.appendChild(c);
+    return svg;
+  }
+  function svgPath(d) {
+    const p = document.createElementNS(SVG_NS, 'path');
+    p.setAttribute('d', d);
+    return p;
+  }
+  function copyGlyph() {
+    const rect = document.createElementNS(SVG_NS, 'rect');
+    for (const [k, v] of Object.entries({ x: '9', y: '9', width: '13', height: '13', rx: '2' })) rect.setAttribute(k, v);
+    return svgIcon([rect, svgPath('M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1')]);
+  }
+  function checkGlyph() {
+    return svgIcon([svgPath('M20 6L9 17l-5-5')]);
+  }
+
+  // A tiny copy button that sits next to a ticket id. stopPropagation keeps a
+  // click on it from opening the card's drawer / archive row.
+  function copyRefBtn(issue) {
+    const btn = el('button', 'copy-id');
+    btn.type = 'button';
+    btn.title = `Copy reference: ${issueRef(issue)}`;
+    btn.setAttribute('aria-label', `Copy an agent-ready reference to ${issue.id}`);
+    btn.appendChild(copyGlyph());
+    let resetT;
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      clearTimeout(resetT);
+      try {
+        await navigator.clipboard.writeText(issueRef(issue));
+        btn.classList.remove('failed');
+        btn.classList.add('copied');
+        btn.replaceChildren(checkGlyph());
+      } catch {
+        btn.classList.remove('copied');
+        btn.classList.add('failed');
+      }
+      resetT = setTimeout(() => {
+        btn.classList.remove('copied', 'failed');
+        btn.replaceChildren(copyGlyph());
+      }, 1200);
+    });
+    return btn;
+  }
+
   async function api(path, opts) {
     const res = await fetch(path, opts);
     if (!res.ok) {
@@ -206,6 +272,7 @@
 
     const top = el('div', 'card-top');
     top.appendChild(el('span', 'card-id', issue.id));
+    top.appendChild(copyRefBtn(issue));
     top.appendChild(el('span', 'card-age', relAge(issue.created)));
     card.appendChild(top);
 
@@ -247,6 +314,7 @@
     for (const issue of visible) {
       const row = el('div', 'archive-row');
       row.appendChild(el('span', 'card-id', issue.id));
+      row.appendChild(copyRefBtn(issue));
       row.appendChild(el('span', 'archive-title', issue.title || (issue.seeing || '').slice(0, 80) || '(untitled)'));
       const meta = el('span', 'card-meta');
       meta.appendChild(el('span', `pill pill-type-${issue.type}`, issue.type));
@@ -273,6 +341,7 @@
     for (const issue of visible) {
       const row = el('div', 'archive-row');
       row.appendChild(el('span', 'card-id', issue.id));
+      row.appendChild(copyRefBtn(issue));
       row.appendChild(el('span', 'archive-title', issue.title || (issue.seeing || '').slice(0, 80) || '(untitled)'));
       const meta = el('span', 'card-meta');
       meta.appendChild(el('span', `pill pill-type-${issue.type}`, issue.type));
@@ -387,7 +456,10 @@
 
     const head = el('div', 'drawer-head');
     const titleWrap = el('div');
-    titleWrap.appendChild(el('div', 'drawer-id', issue.id));
+    const idRow = el('div', 'drawer-id-row');
+    idRow.appendChild(el('span', 'drawer-id', issue.id));
+    idRow.appendChild(copyRefBtn(issue));
+    titleWrap.appendChild(idRow);
     titleWrap.appendChild(el('h2', null, issue.title || '(untitled)'));
     head.appendChild(titleWrap);
     const close = el('button', 'drawer-close', '×');

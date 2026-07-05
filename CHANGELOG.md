@@ -8,6 +8,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Copy-reference button.** A small copy icon sits next to every ticket id (on
+  board cards, in the drawer, and in the icebox/archive lists). One click copies
+  an agent-ready reference like `VibeOps issue platform-48: "Add a copy button"`.
+  Paste it into a chat and say "work on \<paste\>": an agent with the VibeOps MCP
+  server resolves the exact issue via `get_issue`. On cards it appears on hover.
+
 - **On Deck column.** A curated, prioritized queue between Backlog and In Progress.
   Backlog is now your triage pool; you promote items to On Deck for agents to pick up.
   Agents pull work from On Deck (not Backlog), per the updated MCP doctrine.
@@ -33,9 +39,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The Archive view now explains that its items were swept from the Done column.
 - The agent doctrine (`get_tracker_instructions`) now explains how to install the
   capture widget into an app and route it to a project.
+- The MCP server now identifies itself as **VibeOps Tracker** (the doctrine and
+  server name, not just the human-facing UI), and the doctrine documents how a
+  pasted reference like `VibeOps issue platform-48` maps to `get_issue {id}`, so
+  agents resolve copied references without guessing.
 
 ### Fixed
 
+- The capture widget no longer discards a started report when you click outside
+  it. Once any field has text, a backdrop click is a no-op (with a brief shake to
+  show the dialog is intentionally sticky); an untouched, empty dialog still
+  dismisses on an outside click. Escape, ×, and Cancel still close as before.
 - The board no longer snaps a scrolled column back to the top on the 5s refresh.
 - The Help page's `configure` example now waits for `DOMContentLoaded`: the widget
   tag is deferred, so the old bare inline call ran before `window.IssueTracker`

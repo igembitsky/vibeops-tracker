@@ -203,6 +203,26 @@ test('Escape closes the dialog', () => {
   assert.equal(document.querySelector('.it-dialog'), null);
 });
 
+test('a backdrop click with a typed draft keeps the dialog open (draft is not lost)', () => {
+  const { document } = loadWidget();
+  openDialog(document);
+  document.querySelector('.it-seeing').value = 'A long report I do not want to lose to a stray click';
+  document.querySelector('.it-backdrop').click();
+  assert.ok(document.querySelector('.it-dialog'), 'dialog stays open when there is a draft');
+  assert.ok(
+    document.querySelector('.it-dialog').classList.contains('it-shake'),
+    'a nudge signals the dialog is intentionally sticky'
+  );
+});
+
+test('a backdrop click on an untouched dialog still dismisses it', () => {
+  const { document } = loadWidget();
+  openDialog(document);
+  document.querySelector('.it-backdrop').click();
+  assert.equal(document.querySelector('.it-dialog'), null, 'empty dialog dismisses on outside click');
+  assert.equal(document.querySelector('.it-backdrop'), null, 'backdrop removed too');
+});
+
 test('window.IssueTracker public API exists', () => {
   const { window } = loadWidget();
   assert.equal(typeof window.IssueTracker.configure, 'function');

@@ -47,7 +47,7 @@ test('mcp server speaks the protocol and round-trips issues', async (t) => {
     capabilities: {},
     clientInfo: { name: 'test', version: '0.0.0' },
   });
-  assert.equal(init.result.serverInfo.name, 'issue-tracker');
+  assert.equal(init.result.serverInfo.name, 'vibeops-tracker');
   mcp.notify('notifications/initialized');
 
   const tools = await mcp.request('tools/list', {});
@@ -115,6 +115,9 @@ test('mcp server speaks the protocol and round-trips issues', async (t) => {
 
   const instructions = await mcp.request('tools/call', { name: 'get_tracker_instructions', arguments: {} });
   const doctrine = instructions.result.content[0].text;
+  assert.match(doctrine, /VibeOps Tracker/);
+  assert.match(doctrine, /Issue references/i);
+  assert.match(doctrine, /platform-48/);
   assert.match(doctrine, /in-progress/);
   assert.match(doctrine, /resolve_issue/);
   assert.match(doctrine, /never edit/i);
