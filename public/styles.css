@@ -11,6 +11,12 @@
   --sev3: #f59e0b;
   --sev4: #f97316;
   --sev5: #ef4444;
+  /* Activity heat: how long since a card was last worked on. */
+  --heat-fresh: #22c55e;
+  --heat-warm: #facc15;
+  --heat-amber: #eab308;
+  --heat-stale: #ef4444;
+  --new: #22c55e;
 }
 
 * { box-sizing: border-box; }
@@ -456,6 +462,40 @@ body {
 .card-title { font-weight: 600; font-size: 14px; margin-bottom: 6px; overflow-wrap: anywhere; }
 .card-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 
+/* Severity lives in one fixed spot: the far right of the meta row, off the
+   wrapping tags. Type + tags flow from the left; the bars never move. */
+.card-meta.split { flex-wrap: nowrap; justify-content: space-between; gap: 10px; }
+.meta-tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
+.card-meta.split .meta-tags { flex: 1 1 auto; }
+.card-meta.split .sev-bars { flex: 0 0 auto; }
+
+/* Signal-strength severity: five ascending bars, lit up to the level. */
+.sev-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; }
+.sev-bars i { width: 3px; border-radius: 1.5px; background: var(--border); }
+.sev-bars i:nth-child(1) { height: 5px; }
+.sev-bars i:nth-child(2) { height: 7px; }
+.sev-bars i:nth-child(3) { height: 9px; }
+.sev-bars i:nth-child(4) { height: 11px; }
+.sev-bars i:nth-child(5) { height: 13px; }
+
+/* New-since-last-seen marker: a small green dot before the id. */
+.new-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--new); box-shadow: 0 0 0 3px rgba(34, 197, 94, .18); flex: 0 0 auto; }
+
+/* The card's one time: last-activity age, color set inline by heat. */
+.card-age.hot { font-weight: 600; font-size: 12px; }
+
+/* Backlog sort toggle, in the column header. */
+.sort-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: transparent; border: 1px solid transparent; color: var(--muted);
+  border-radius: 7px; padding: 2px 7px; font: inherit; font-size: 11px;
+  text-transform: none; letter-spacing: 0; cursor: pointer; transition: .12s;
+}
+.sort-btn:hover { border-color: var(--border); color: var(--text); background: var(--panel-2); }
+.sort-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.sort-btn svg { width: 12px; height: 12px; transition: transform .18s ease; }
+.sort-btn.desc svg { transform: scaleY(-1); }
+
 .pill {
   border-radius: 999px;
   padding: 2px 9px;
@@ -548,6 +588,12 @@ body {
 .drawer-close:hover { color: var(--text); }
 
 .drawer-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0 4px; }
+
+/* Both timestamps, spelled out (created is board-hidden, so it lives here). */
+.drawer-times { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 8px 0 2px; font-size: 12.5px; }
+.drawer-times .dtime { display: inline-flex; align-items: center; gap: 6px; }
+.drawer-times .dtime-k { color: var(--muted); text-transform: uppercase; font-size: 10.5px; letter-spacing: .06em; font-weight: 600; }
+.drawer-times .dtime-v { color: var(--text); font-variant-numeric: tabular-nums; }
 
 .drawer-actions { display: flex; gap: 8px; margin: 14px 0; align-items: center; }
 

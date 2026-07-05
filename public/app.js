@@ -22,6 +22,8 @@
     query: '',
     draggingId: null,
     drawerId: null,
+    lastSeenAt: 0, // new-since-last-seen watermark; set in boot()
+    backlogSort: localStorage.getItem('it-backlog-sort') || 'newest', // newest | oldest
   };
 
   const $board = document.getElementById('board');
@@ -104,6 +106,85 @@
         btn.classList.remove('copied', 'failed');
         btn.replaceChildren(copyGlyph());
       }, 1200);
+    });
+    return btn;
+  }
+
+  // ---- severity, activity age, new-marker, sort ---------------------------
+
+  // Signal-strength severity: five ascending bars, lit up to the level. Lives in
+  // one fixed spot (far right of the meta row) so severity always reads the same.
+  function severityBars(level) {
+    const n = Math.max(1, Math.min(5, Number(level) || 3));
+    const wrap = el('span', 'sev-bars');
+    wrap.setAttribute('role', 'img');
+    wrap.setAttribute('aria-label', `Severity ${n} of 5`);
+    wrap.title = `Severity ${n}`;
+    for (let i = 1; i <= 5; i++) {
+      const bar = el('i');
+      if (i <= n) bar.style.background = `var(--sev${n})`;
+      wrap.appendChild(bar);
+    }
+    return wrap;
+  }
+
+  function lastActivityIso(issue) {
+    return issue.lastActivity || issue.updated || issue.created;
+  }
+
+  // Aging heat: bright green while fresh, warming to red once a card sits idle.
+  // Bucket by whole days so the color matches the day count the card displays
+  // (a card reading "2d" is yellow, never the 3-7d amber for being 2d + seconds).
+  function heatColor(iso) {
+    if (!iso) return 'var(--muted)';
+    const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+    if (days < 1) return 'var(--heat-fresh)';
+    if (days <= 2) return 'var(--heat-warm)';
+    if (days <= 7) return 'var(--heat-amber)';
+    return 'var(--heat-stale)';
+  }
+
+  // The card's one time: how long since the issue was last worked on.
+  function activityAge(issue) {
+    const iso = lastActivityIso(issue);
+    const span = el('span', 'card-age hot', relAge(iso));
+    span.style.color = heatColor(iso);
+    span.title = `Last activity ${relAge(iso)} ago`;
+    return span;
+  }
+
+  // New since the previous visit: created after the stored last-seen watermark.
+  function isNew(issue) {
+    return !!(state.lastSeenAt && issue.created && new Date(issue.created).getTime() > state.lastSeenAt);
+  }
+
+  function fmtDate(iso) {
+    return iso ? new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+  }
+
+  function sortGlyph() {
+    // A down arrow that flips (via the .desc CSS) between newest and oldest.
+    return svgIcon([svgPath('M12 5v14'), svgPath('m19 12-7 7-7-7')]);
+  }
+
+  function sortBacklog(issues) {
+    const dir = state.backlogSort === 'oldest' ? 1 : -1;
+    return issues.slice().sort((a, b) => (new Date(a.created || 0) - new Date(b.created || 0)) * dir || a.id.localeCompare(b.id));
+  }
+
+  function sortToggle() {
+    const oldest = state.backlogSort === 'oldest';
+    const btn = el('button', 'sort-btn' + (oldest ? ' desc' : ''));
+    btn.type = 'button';
+    btn.appendChild(sortGlyph());
+    btn.appendChild(el('span', 'sort-txt', oldest ? 'Oldest' : 'Newest'));
+    btn.title = `Backlog sorted ${oldest ? 'oldest' : 'newest'} first (click to flip)`;
+    btn.setAttribute('aria-label', btn.title);
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.backlogSort = oldest ? 'newest' : 'oldest';
+      localStorage.setItem('it-backlog-sort', state.backlogSort);
+      render();
     });
     return btn;
   }
@@ -230,11 +311,13 @@
     $board.className = '';
     $board.replaceChildren();
     for (const status of STATUSES) {
-      const issues = visible.filter((i) => i.status === status.key);
+      let issues = visible.filter((i) => i.status === status.key);
+      if (status.key === 'backlog') issues = sortBacklog(issues); // created newest/oldest, persisted
       const col = el('div', 'col');
       const head = el('div', 'col-head');
       head.appendChild(el('span', null, status.label));
       const right = el('span', 'col-head-right');
+      if (status.key === 'backlog' && issues.length) right.appendChild(sortToggle());
       if (status.key === 'done' && issues.length && !state.query) {
         const sweep = el('button', 'sweep-btn', 'Sweep');
         sweep.title = 'Move all Done issues to the archive';
@@ -271,17 +354,20 @@
     card.dataset.ordinal = issue.ordinal;
 
     const top = el('div', 'card-top');
+    if (isNew(issue)) top.appendChild(el('span', 'new-dot'));
     top.appendChild(el('span', 'card-id', issue.id));
     top.appendChild(copyRefBtn(issue));
-    top.appendChild(el('span', 'card-age', relAge(issue.created)));
+    top.appendChild(activityAge(issue));
     card.appendChild(top);
 
     card.appendChild(el('div', 'card-title', issue.title || (issue.seeing || '').slice(0, 80) || '(untitled)'));
 
-    const meta = el('div', 'card-meta');
-    meta.appendChild(el('span', `pill pill-type-${issue.type}`, issue.type));
-    meta.appendChild(el('span', `pill pill-sev pill-sev-${issue.severity}`, `S${issue.severity}`));
-    for (const tag of issue.tags || []) meta.appendChild(el('span', 'tag', tag));
+    const meta = el('div', 'card-meta split');
+    const tags = el('div', 'meta-tags');
+    tags.appendChild(el('span', `pill pill-type-${issue.type}`, issue.type));
+    for (const tag of issue.tags || []) tags.appendChild(el('span', 'tag', tag));
+    meta.appendChild(tags);
+    meta.appendChild(severityBars(issue.severity)); // fixed spot, far right
     card.appendChild(meta);
 
     card.addEventListener('click', () => openDrawer(issue.id));
@@ -318,7 +404,7 @@
       row.appendChild(el('span', 'archive-title', issue.title || (issue.seeing || '').slice(0, 80) || '(untitled)'));
       const meta = el('span', 'card-meta');
       meta.appendChild(el('span', `pill pill-type-${issue.type}`, issue.type));
-      meta.appendChild(el('span', `pill pill-sev pill-sev-${issue.severity}`, `S${issue.severity}`));
+      meta.appendChild(severityBars(issue.severity));
       meta.appendChild(el('span', 'card-age', `closed ${issue.closed ? new Date(issue.closed).toLocaleDateString() : ''}`));
       row.appendChild(meta);
       row.addEventListener('click', () => openDrawer(issue.id));
@@ -345,7 +431,7 @@
       row.appendChild(el('span', 'archive-title', issue.title || (issue.seeing || '').slice(0, 80) || '(untitled)'));
       const meta = el('span', 'card-meta');
       meta.appendChild(el('span', `pill pill-type-${issue.type}`, issue.type));
-      meta.appendChild(el('span', `pill pill-sev pill-sev-${issue.severity}`, `S${issue.severity}`));
+      meta.appendChild(severityBars(issue.severity));
       meta.appendChild(el('span', 'card-age', `iced ${issue.iceboxed ? new Date(issue.iceboxed).toLocaleDateString() : ''}`));
       const back = el('button', 'btn revive-btn', '↑ Backlog');
       back.title = 'Bring this item back to the board (Backlog)';
@@ -513,11 +599,25 @@
       meta.appendChild(patchPill('severity', issue.severity, `pill-sev pill-sev-${issue.severity}`, [1, 2, 3, 4, 5].map((s) => ({ value: s, label: `Severity ${s}` }))));
     }
     for (const tag of issue.tags || []) meta.appendChild(el('span', 'tag', tag));
-    meta.appendChild(el('span', 'card-age', `created ${relAge(issue.created)} ago`));
     if (issue.relatedTo) meta.appendChild(el('span', 'tag', `related: ${issue.relatedTo}`));
     if (issue.closed) meta.appendChild(el('span', 'pill pill-closed', `archived ${new Date(issue.closed).toLocaleDateString()}`));
     else if (issue.iceboxed) meta.appendChild(el('span', 'pill pill-iceboxed', `iceboxed ${new Date(issue.iceboxed).toLocaleDateString()}`));
     $drawer.appendChild(meta);
+
+    // Both timestamps live here; the board card shows only the last-activity age.
+    const times = el('div', 'drawer-times');
+    const upIso = lastActivityIso(issue);
+    const created = el('span', 'dtime');
+    created.appendChild(el('span', 'dtime-k', 'Created'));
+    created.appendChild(el('span', 'dtime-v', fmtDate(issue.created)));
+    times.appendChild(created);
+    const updated = el('span', 'dtime');
+    updated.appendChild(el('span', 'dtime-k', 'Updated'));
+    const uv = el('span', 'dtime-v', `${relAge(upIso)} ago`);
+    uv.style.color = heatColor(upIso);
+    updated.appendChild(uv);
+    times.appendChild(updated);
+    $drawer.appendChild(times);
 
     const actions = el('div', 'drawer-actions');
     if (!readOnly) {
@@ -1223,6 +1323,15 @@
   // ---- boot ---------------------------------------------------------------
 
   async function boot() {
+    // New-since-last-seen: compare each card's created time against the last
+    // visit. The first visit ever stamps "now" so nothing floods in as new.
+    const storedSeen = localStorage.getItem('it-last-seen');
+    state.lastSeenAt = storedSeen ? Number(storedSeen) : Date.now();
+    if (!storedSeen) localStorage.setItem('it-last-seen', String(state.lastSeenAt));
+    const markSeen = () => localStorage.setItem('it-last-seen', String(Date.now()));
+    addEventListener('beforeunload', markSeen);
+    addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') markSeen(); });
+
     await loadProjects();
 
     // deep link: #<issue-id> selects the project and opens the drawer

@@ -156,6 +156,36 @@ test('updateIssue patches allowed fields, bumps updated, rejects bad input', asy
   assert.throws(() => updateIssue(dir, 'p-404', { status: 'done' }), (e) => e.code === 'NOT_FOUND');
 });
 
+test('lastActivity bumps only on create, status/list moves, and comments', async () => {
+  const dir = tmpDataDir();
+  const a = createIssue(dir, { project: 'p', title: 't', seeing: 's', expecting: 'e' });
+  assert.equal(a.lastActivity, a.created, 'created stamps lastActivity');
+
+  // A quiet edit (severity/title/tags, no status change) bumps `updated` but NOT lastActivity.
+  await new Promise((r) => setTimeout(r, 5));
+  const quiet = updateIssue(dir, a.id, { severity: 5, title: 'renamed', tags: ['x'] });
+  assert.ok(quiet.updated > a.updated, 'a quiet edit still bumps updated');
+  assert.equal(quiet.lastActivity, a.lastActivity, 'a quiet edit leaves lastActivity untouched');
+
+  // A reorder (ordinal only) is not activity either.
+  await new Promise((r) => setTimeout(r, 5));
+  const reordered = updateIssue(dir, a.id, { ordinal: 42 });
+  assert.equal(reordered.lastActivity, a.lastActivity, 'a reorder leaves lastActivity untouched');
+
+  // A status move IS activity.
+  await new Promise((r) => setTimeout(r, 5));
+  const moved = updateIssue(dir, a.id, { status: 'in-progress' });
+  assert.ok(moved.lastActivity > a.lastActivity, 'a status move bumps lastActivity');
+
+  // A comment IS activity.
+  await new Promise((r) => setTimeout(r, 5));
+  const commented = addComment(dir, a.id, { author: 'igor', text: 'note' });
+  assert.ok(commented.lastActivity > moved.lastActivity, 'a comment bumps lastActivity');
+
+  // It round-trips through the file.
+  assert.equal(getIssue(dir, a.id).lastActivity, commented.lastActivity);
+});
+
 test('addComment appends comments and preserves earlier ones', () => {
   const dir = tmpDataDir();
   const a = createIssue(dir, { project: 'p', seeing: 's', expecting: 'e' });

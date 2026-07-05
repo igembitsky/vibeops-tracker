@@ -8,6 +8,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Board card redesign.** Severity now shows as signal-strength bars pinned to a
+  fixed spot (far right of every card), so it always reads from the same place
+  instead of drifting with the tags. Each card shows one time, the last-activity
+  age, color-coded by how long it has sat idle (green today, yellow after a day or
+  two, red past a week); the full created and updated timestamps moved into the
+  drawer. Cards created since your last visit get a small green "new" dot, tracked
+  per browser via a last-seen timestamp so each card is only ever flagged once.
+- **Backlog sort.** A subtle toggle in the Backlog header sorts by created date,
+  newest or oldest first, and remembers your choice.
 - **Smart tag input.** The tags field, in the capture widget and in the
   board's new-issue modal, is now chips with typeahead over the project's
   existing tags (with usage counts), a "Recent:" row of one-click tags, and an
@@ -53,6 +62,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Issues now track a `last_activity` timestamp that bumps only on substantive
+  events (creation, a status or list move, or a comment), not on quiet edits like
+  retitling, changing severity/type, retagging, or reordering. The board's card
+  age and its color heat read from it, so "how long since anyone worked this" is
+  honest. Older issue files backfill it from `updated` on first read.
 - The Archive view now explains that its items were swept from the Done column.
 - The agent doctrine (`get_tracker_instructions`) now explains how to install the
   capture widget into an app and route it to a project.
