@@ -349,3 +349,102 @@ test('repeated dialog open/close does not accumulate document keydown/drag liste
   document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
   assert.equal(document.querySelector('.it-dialog'), null);
 });
+
+// ---- tag suggestions --------------------------------------------------------
+
+const VOCAB = [
+  { name: 'ux', count: 4, lastUsed: '2026-07-01T00:00:00Z' },
+  { name: 'widget', count: 2, lastUsed: '2026-07-03T00:00:00Z' },
+  { name: 'mcp', count: 1, lastUsed: '2026-07-02T00:00:00Z' },
+];
+
+function loadWidgetWithVocab(vocabResponse) {
+  const calls = [];
+  const loaded = loadWidget({
+    fetchImpl: (url, opts = {}) => {
+      calls.push({ url: String(url), opts });
+      if (String(url).includes('/api/projects/platform/tags')) return vocabResponse();
+      return Promise.resolve({ ok: true, status: 201, json: async () => ({ id: 'platform-1' }) });
+    },
+  });
+  return { ...loaded, calls };
+}
+
+test('tag field lists fetched vocabulary; clicking a suggestion commits a chip and closes the list', async () => {
+  const { window, document, calls } = loadWidgetWithVocab(() =>
+    Promise.resolve({ ok: true, status: 200, json: async () => VOCAB })
+  );
+  openDialog(document);
+  await tick(); // vocabulary fetch resolves
+
+  // recent row: most recently used first
+  const recents = [...document.querySelectorAll('.it-recent-chip')].map((b) => b.textContent);
+  assert.deepEqual(recents, ['+widget', '+mcp', '+ux']);
+
+  // focusing lists suggestions, most used first, with counts
+  document.querySelector('.it-tags').focus();
+  const rows = [...document.querySelectorAll('.it-dd-row')];
+  assert.deepEqual(rows.map((r) => r.querySelector('.it-dd-name').textContent), ['ux', 'widget', 'mcp']);
+  assert.deepEqual(rows.map((r) => r.querySelector('.it-dd-count').textContent), ['4', '2', '1']);
+
+  rows[0].click(); // pick "ux"
+  assert.match(document.querySelector('.it-chip').textContent, /^ux/);
+  assert.equal(document.querySelector('.it-dd.it-open'), null, 'list closes after picking');
+
+  // chips + uncommitted typed text both reach the payload
+  document.querySelector('.it-seeing').value = 's';
+  document.querySelector('.it-expecting').value = 'e';
+  document.querySelector('.it-tags').value = 'infra';
+  document.querySelector('.it-submit').click();
+  await tick();
+  const post = calls.find((c) => c.url === 'http://localhost:4400/api/issues');
+  assert.deepEqual(JSON.parse(post.opts.body).tags, ['ux', 'infra']);
+});
+
+test('typing an unknown tag shows an explicit new-tag row; a known one does not', async () => {
+  const { document } = loadWidgetWithVocab(() =>
+    Promise.resolve({ ok: true, status: 200, json: async () => VOCAB })
+  );
+  openDialog(document);
+  await tick();
+
+  const input = document.querySelector('.it-tags');
+  input.focus();
+  input.value = 'infra';
+  input.dispatchEvent(new document.defaultView.Event('input', { bubbles: true }));
+  const create = document.querySelector('.it-dd-create');
+  assert.ok(create, 'create row appears for an unknown name');
+  assert.match(create.textContent, /Create “infra”/);
+  assert.match(create.textContent, /new tag/);
+
+  input.value = 'ux';
+  input.dispatchEvent(new document.defaultView.Event('input', { bubbles: true }));
+  assert.equal(document.querySelector('.it-dd-create'), null, 'no create row for an existing tag');
+});
+
+test('a failed vocabulary fetch never breaks the dialog; typed tags still submit', async () => {
+  const { document, calls } = loadWidgetWithVocab(() => Promise.reject(new Error('tracker offline')));
+  openDialog(document);
+  await tick();
+
+  assert.ok(document.querySelector('.it-dialog'), 'dialog opened despite failed fetch');
+  assert.equal(document.querySelectorAll('.it-recent-chip').length, 0);
+  document.querySelector('.it-seeing').value = 's';
+  document.querySelector('.it-expecting').value = 'e';
+  document.querySelector('.it-tags').value = 'auth, ui';
+  document.querySelector('.it-submit').click();
+  await tick();
+  const post = calls.find((c) => c.url === 'http://localhost:4400/api/issues');
+  assert.deepEqual(JSON.parse(post.opts.body).tags, ['auth', 'ui']);
+});
+
+test('a committed chip makes the dialog sticky against backdrop clicks', async () => {
+  const { document } = loadWidgetWithVocab(() =>
+    Promise.resolve({ ok: true, status: 200, json: async () => VOCAB })
+  );
+  openDialog(document);
+  await tick();
+  document.querySelector('.it-recent-chip').click(); // commit a chip, nothing typed
+  document.querySelector('.it-backdrop').click();
+  assert.ok(document.querySelector('.it-dialog'), 'chips count as a started draft');
+});

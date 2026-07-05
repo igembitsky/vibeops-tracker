@@ -316,6 +316,72 @@ test('DELETE/PATCH from a foreign Origin are refused (CSRF guard); same-origin a
   assert.equal(ok.status, 200);
 });
 
+test('tag vocabulary and maintenance routes: list, rename/merge, delete', async () => {
+  for (const tags of [['ux', 'widget'], ['ux'], ['ui']]) {
+    const res = await fetch(`${base}/api/issues`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project: 'tagproj', seeing: 's', expecting: 'e', tags }),
+    });
+    assert.equal(res.status, 201);
+  }
+
+  // vocabulary is per project, most-used first, with counts
+  let res = await fetch(`${base}/api/projects/tagproj/tags`);
+  assert.equal(res.status, 200);
+  let vocab = await json(res);
+  assert.deepEqual(vocab.map((t) => [t.name, t.count]), [['ux', 2], ['ui', 1], ['widget', 1]]);
+  assert.ok(vocab[0].lastUsed, 'lastUsed is stamped');
+
+  // rename onto an existing name merges
+  res = await fetch(`${base}/api/projects/tagproj/tags`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: 'ui', to: 'ux' }),
+  });
+  assert.equal(res.status, 200);
+  assert.deepEqual(await json(res), { from: 'ui', to: 'ux', retagged: 1, merged: true });
+  vocab = await json(await fetch(`${base}/api/projects/tagproj/tags`));
+  assert.deepEqual(vocab.map((t) => [t.name, t.count]), [['ux', 3], ['widget', 1]]);
+
+  // delete removes the tag everywhere; deleting again is a 404
+  res = await fetch(`${base}/api/projects/tagproj/tags/widget`, { method: 'DELETE' });
+  assert.equal(res.status, 200);
+  assert.deepEqual(await json(res), { name: 'widget', untagged: 1 });
+  res = await fetch(`${base}/api/projects/tagproj/tags/widget`, { method: 'DELETE' });
+  assert.equal(res.status, 404);
+
+  // renaming a nonexistent tag is a 404; a missing name is a 400
+  res = await fetch(`${base}/api/projects/tagproj/tags`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: 'nope', to: 'x' }),
+  });
+  assert.equal(res.status, 404);
+  res = await fetch(`${base}/api/projects/tagproj/tags`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: 'ux' }),
+  });
+  assert.equal(res.status, 400);
+});
+
+test('tag maintenance is refused cross-origin (CSRF guard)', async () => {
+  const evilRename = await fetch(`${base}/api/projects/tagproj/tags`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Origin: 'http://evil.example' },
+    body: JSON.stringify({ from: 'ux', to: 'pwned' }),
+  });
+  assert.equal(evilRename.status, 403);
+  const evilDelete = await fetch(`${base}/api/projects/tagproj/tags/ux`, {
+    method: 'DELETE',
+    headers: { Origin: 'http://evil.example' },
+  });
+  assert.equal(evilDelete.status, 403);
+  const vocab = await json(await fetch(`${base}/api/projects/tagproj/tags`));
+  assert.deepEqual(vocab.map((t) => t.name), ['ux'], 'vocabulary survived the refused requests');
+});
+
 test('OPTIONS preflight returns 204 with CORS headers', async () => {
   const res = await fetch(`${base}/api/issues`, { method: 'OPTIONS' });
   assert.equal(res.status, 204);

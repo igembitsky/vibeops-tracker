@@ -8,6 +8,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Smart tag input.** The tags field, in the capture widget and in the
+  board's new-issue modal, is now chips with typeahead over the project's
+  existing tags (with usage counts), a "Recent:" row of one-click tags, and an
+  explicit "new tag" row so creating a tag is always deliberate. Picking a tag
+  commits the chip and closes the dropdown. On the board, a pencil on each
+  suggestion additionally opens inline rename and delete, and renaming a tag
+  onto an existing name offers a merge. Tag vocabularies are per project and
+  derived from the issue files; nothing new to sync. In the widget the
+  vocabulary fetch is best-effort: an unreachable tracker just means no
+  suggestions, and typed comma-separated tags work like before.
+- New tag API: `GET /api/projects/:key/tags` (names, counts, last-used),
+  `PATCH /api/projects/:key/tags` `{from, to}` to rename or merge across all
+  of a project's issues (open, icebox, and closed), and
+  `DELETE /api/projects/:key/tags/:name` to remove a tag everywhere. Rename
+  and delete are same-origin only (CSRF guard) and never bump issues'
+  `updated` timestamps.
+
 - **Copy-reference button.** A small copy icon sits next to every ticket id (on
   board cards, in the drawer, and in the icebox/archive lists). One click copies
   an agent-ready reference like `VibeOps issue platform-48: "Add a copy button"`.

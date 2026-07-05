@@ -168,6 +168,194 @@ body {
 .form-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .form-error { color: var(--sev5); font-size: 13px; min-height: 16px; }
 
+/* ---- tag field (new-issue modal) ---- */
+.tagfield { display: flex; flex-direction: column; }
+.tagbox {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 8px;
+  cursor: text;
+}
+.tagbox:focus-within { outline: 2px solid var(--accent); outline-offset: -1px; }
+.tagbox input {
+  flex: 1;
+  min-width: 90px;
+  background: none;
+  border: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  padding: 3px 2px;
+}
+.tagbox input:focus { outline: none; }
+.tagbox input::placeholder { color: var(--muted); }
+
+.tagchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 4px 1px 9px;
+  font-size: 12px;
+}
+.tagchip-x {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 999px;
+}
+.tagchip-x:hover { color: var(--text); background: rgba(255, 255, 255, .08); }
+
+/* Suggestions dropdown. Rendered in flow (not absolutely positioned) so the
+   modal's overflow-y scroll can never clip it; opening pushes the form down. */
+.tag-dd {
+  display: none;
+  margin-top: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .45);
+  overflow: hidden;
+}
+.tag-dd.open { display: block; }
+.tag-dd-list { max-height: 200px; overflow-y: auto; padding: 4px; }
+.tag-dd-hint {
+  padding: 5px 12px 6px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 11px;
+  display: flex;
+  gap: 12px;
+}
+.tag-dd-hint kbd {
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 5px;
+  margin-right: 2px;
+}
+.tag-dd-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  border-radius: 7px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.tag-dd-row.active { background: rgba(99, 102, 241, .16); }
+.tag-dd-name { overflow-wrap: anywhere; }
+.tag-dd-name b { color: #a5b4fc; font-weight: 600; }
+.tag-dd-count {
+  margin-left: auto;
+  color: var(--muted);
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.tag-dd-edit {
+  background: none;
+  border: none;
+  color: var(--muted);
+  border-radius: 6px;
+  padding: 3px 5px;
+  line-height: 0;
+  opacity: 0;
+  cursor: pointer;
+  flex: none;
+}
+.tag-dd-row:hover .tag-dd-edit,
+.tag-dd-row.active .tag-dd-edit,
+.tag-dd-edit:focus-visible { opacity: 1; }
+.tag-dd-edit:hover { color: var(--text); background: rgba(255, 255, 255, .08); }
+.tag-dd-edit:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.tag-dd-create { border-top: 1px solid var(--border); border-radius: 0 0 7px 7px; }
+.tag-dd-plus {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: 1px dashed #22c55e;
+  border-radius: 999px;
+  color: #22c55e;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  line-height: 1;
+}
+.tag-dd-new {
+  margin-left: auto;
+  border: 1px solid #22c55e;
+  background: rgba(34, 197, 94, .12);
+  color: #22c55e;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+/* Inline tag editor (rename / merge / delete) inside the dropdown. */
+.tag-dd-editor { padding: 8px 9px 9px; display: flex; flex-direction: column; gap: 7px; }
+.tag-dd-editor input {
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: 7px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 9px;
+}
+.tag-dd-editor input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.tag-ed-hint { color: var(--muted); font-size: 11.5px; margin: 0; }
+.tag-ed-hint.merge { color: #22c55e; }
+.tag-ed-hint.error { color: var(--sev5); }
+.tag-ed-actions { display: flex; gap: 6px; }
+.tag-ed-btn {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 7px;
+  padding: 4px 11px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.tag-ed-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.tag-ed-btn.merge { background: rgba(34, 197, 94, .12); border-color: #22c55e; color: #22c55e; }
+.tag-ed-btn.danger { color: var(--sev5); border-color: rgba(239, 68, 68, .4); background: none; margin-left: auto; }
+.tag-ed-btn.danger:hover { background: rgba(239, 68, 68, .12); }
+.tag-ed-btn:disabled { opacity: .5; cursor: default; }
+
+/* One-click recently used tags under the field. */
+.tag-recent { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.tag-recent-label { color: var(--muted); font-size: 11px; margin-right: 2px; }
+.tag-recent-chip {
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  padding: 2px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.tag-recent-chip:hover { color: var(--text); border-color: var(--muted); }
+.tag-recent-chip span { color: var(--accent); margin-right: 3px; }
+
 #board {
   display: grid;
   /* One equal track per status column; adapts to however many STATUSES exist. */

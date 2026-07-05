@@ -717,6 +717,366 @@
     $drawer.appendChild(danger);
   }
 
+  // ---- tag field ------------------------------------------------------------
+  // Chips + typeahead over the project's existing tags (GET /api/projects/:key/tags).
+  // Focusing the field lists the most-used tags with counts; typing filters them;
+  // an unknown name gets an explicit "new tag" row so growing the vocabulary is
+  // always deliberate. The pencil on a suggestion opens inline rename / delete,
+  // and renaming onto an existing name becomes a merge. Picking a tag commits
+  // the chip and closes the dropdown; click the field again to add another.
+
+  function pencilGlyph() {
+    return svgIcon([svgPath('M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z')]);
+  }
+
+  function tagField(projectKey) {
+    const tagsUrl = `/api/projects/${encodeURIComponent(projectKey)}/tags`;
+    let vocab = []; // [{name, count, lastUsed}] from the server
+    let selected = [];
+    let open = false;
+    let activeIndex = -1;
+    let editing = null; // tag name being edited inline, or null
+
+    const root = el('div', 'tagfield');
+    const box = el('div', 'tagbox');
+    const input = el('input');
+    input.placeholder = 'Type to search or create…';
+    input.autocomplete = 'off';
+    box.appendChild(input);
+    const dd = el('div', 'tag-dd');
+    const list = el('div', 'tag-dd-list');
+    const hints = el('div', 'tag-dd-hint');
+    for (const [keys, label] of [[['↑', '↓'], 'navigate'], [['↵'], 'add'], [['esc'], 'close']]) {
+      const span = el('span');
+      for (const k of keys) span.appendChild(el('kbd', null, k));
+      span.appendChild(document.createTextNode(` ${label}`));
+      hints.appendChild(span);
+    }
+    dd.appendChild(list);
+    dd.appendChild(hints);
+    const recent = el('div', 'tag-recent');
+    root.appendChild(box);
+    root.appendChild(dd);
+    root.appendChild(recent);
+
+    const query = () => input.value.trim().toLowerCase();
+    const knownName = (name) => {
+      const hit = vocab.find((t) => t.name.toLowerCase() === name.toLowerCase());
+      return hit ? hit.name : null;
+    };
+
+    function matches() {
+      const q = query();
+      return vocab
+        .filter((t) => !selected.includes(t.name) && (!q || t.name.toLowerCase().includes(q)))
+        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+    }
+
+    function addTag(name) {
+      name = name.trim().replace(/,/g, '');
+      if (!name) return;
+      name = knownName(name) || name;
+      if (!selected.includes(name)) selected.push(name);
+      input.value = '';
+      activeIndex = -1;
+      open = false;
+      editing = null;
+      renderAll();
+      input.blur();
+    }
+
+    function removeTag(name) {
+      selected = selected.filter((n) => n !== name);
+      renderAll();
+    }
+
+    function renderChips() {
+      box.querySelectorAll('.tagchip').forEach((c) => c.remove());
+      for (const name of selected) {
+        const chip = el('span', 'tagchip', name);
+        const x = el('button', 'tagchip-x', '×');
+        x.type = 'button';
+        x.setAttribute('aria-label', `Remove tag ${name}`);
+        x.addEventListener('click', (e) => {
+          e.stopPropagation();
+          removeTag(name);
+        });
+        chip.appendChild(x);
+        box.insertBefore(chip, input);
+      }
+    }
+
+    function renderRecent() {
+      recent.replaceChildren();
+      const latest = vocab
+        .filter((t) => !selected.includes(t.name))
+        .sort((a, b) => String(b.lastUsed).localeCompare(String(a.lastUsed)))
+        .slice(0, 6);
+      if (!latest.length) return;
+      recent.appendChild(el('span', 'tag-recent-label', 'Recent:'));
+      for (const t of latest) {
+        const b = el('button', 'tag-recent-chip');
+        b.type = 'button';
+        b.appendChild(el('span', null, '+'));
+        b.appendChild(document.createTextNode(t.name));
+        b.addEventListener('click', () => addTag(t.name));
+        recent.appendChild(b);
+      }
+    }
+
+    function highlightName(name) {
+      const holder = el('span', 'tag-dd-name');
+      const q = query();
+      const i = q ? name.toLowerCase().indexOf(q) : -1;
+      if (i < 0) {
+        holder.textContent = name;
+        return holder;
+      }
+      holder.appendChild(document.createTextNode(name.slice(0, i)));
+      holder.appendChild(el('b', null, name.slice(i, i + q.length)));
+      holder.appendChild(document.createTextNode(name.slice(i + q.length)));
+      return holder;
+    }
+
+    function issueNoun(n) {
+      return `${n} ${n === 1 ? 'issue' : 'issues'}`;
+    }
+
+    // Inline editor for one vocabulary tag: rename, merge (rename onto an
+    // existing name), or delete. Server ops rewrite every issue file carrying
+    // the tag, so the board refreshes afterwards.
+    function renderEditor(t) {
+      const wrap = el('div', 'tag-dd-editor');
+      const inp = el('input');
+      inp.value = t.name;
+      inp.setAttribute('aria-label', `Rename tag ${t.name}`);
+      const hint = el('p', 'tag-ed-hint');
+      const actions = el('div', 'tag-ed-actions');
+      const save = el('button', 'tag-ed-btn primary', 'Rename');
+      const cancel = el('button', 'tag-ed-btn', 'Cancel');
+      const del = el('button', 'tag-ed-btn danger', 'Delete');
+      for (const b of [save, cancel, del]) b.type = 'button';
+      actions.appendChild(save);
+      actions.appendChild(cancel);
+      actions.appendChild(del);
+      wrap.appendChild(inp);
+      wrap.appendChild(hint);
+      wrap.appendChild(actions);
+
+      function mergeTarget() {
+        const v = inp.value.trim();
+        if (!v || v.toLowerCase() === t.name.toLowerCase()) return null;
+        return knownName(v);
+      }
+      function sync() {
+        const target = mergeTarget();
+        if (target) {
+          save.textContent = `Merge into “${target}”`;
+          save.className = 'tag-ed-btn merge';
+          hint.className = 'tag-ed-hint merge';
+          hint.textContent = `“${target}” already exists. Merging retags ${issueNoun(t.count)}.`;
+        } else {
+          save.textContent = 'Rename';
+          save.className = 'tag-ed-btn primary';
+          hint.className = 'tag-ed-hint';
+          hint.textContent = `Renames the tag on ${issueNoun(t.count)}.`;
+        }
+      }
+      sync();
+      inp.addEventListener('input', sync);
+      inp.addEventListener('keydown', (e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') save.click();
+        if (e.key === 'Escape') cancel.click();
+      });
+
+      async function run(op) {
+        save.disabled = cancel.disabled = del.disabled = true;
+        try {
+          await op();
+          vocab = await api(tagsUrl);
+          editing = null;
+          renderAll();
+          input.focus();
+          refresh(); // tag pills on board cards changed
+        } catch (err) {
+          save.disabled = cancel.disabled = del.disabled = false;
+          hint.className = 'tag-ed-hint error';
+          hint.textContent = err.message;
+        }
+      }
+      save.addEventListener('click', () => {
+        const to = inp.value.trim();
+        if (!to || to === t.name) return;
+        run(async () => {
+          const res = await api(tagsUrl, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ from: t.name, to }),
+          });
+          selected = [...new Set(selected.map((n) => (n === t.name ? res.to : n)))];
+        });
+      });
+      del.addEventListener('click', () => {
+        run(async () => {
+          await api(`${tagsUrl}/${encodeURIComponent(t.name)}`, { method: 'DELETE' });
+          selected = selected.filter((n) => n !== t.name);
+        });
+      });
+      cancel.addEventListener('click', () => {
+        editing = null;
+        renderDropdown();
+        input.focus();
+      });
+
+      setTimeout(() => {
+        inp.focus();
+        inp.select();
+      }, 0);
+      return wrap;
+    }
+
+    function renderDropdown() {
+      list.replaceChildren();
+      const rows = matches();
+      const q = query();
+      const creatable = q && !knownName(q) && !selected.some((n) => n.toLowerCase() === q);
+      activeIndex = Math.min(activeIndex, rows.length - (creatable ? 0 : 1));
+
+      rows.forEach((t, i) => {
+        if (editing === t.name) {
+          list.appendChild(renderEditor(t));
+          return;
+        }
+        const row = el('div', 'tag-dd-row' + (i === activeIndex ? ' active' : ''));
+        row.appendChild(highlightName(t.name));
+        row.appendChild(el('span', 'tag-dd-count', String(t.count)));
+        const edit = el('button', 'tag-dd-edit');
+        edit.type = 'button';
+        edit.setAttribute('aria-label', `Edit tag ${t.name}`);
+        edit.appendChild(pencilGlyph());
+        edit.addEventListener('click', (e) => {
+          e.stopPropagation();
+          editing = t.name;
+          renderDropdown();
+        });
+        row.appendChild(edit);
+        row.addEventListener('click', () => addTag(t.name));
+        row.addEventListener('mousemove', () => {
+          if (activeIndex !== i) {
+            activeIndex = i;
+            paintActive();
+          }
+        });
+        list.appendChild(row);
+      });
+
+      if (creatable) {
+        const row = el('div', 'tag-dd-row tag-dd-create' + (activeIndex === rows.length ? ' active' : ''));
+        row.appendChild(el('span', 'tag-dd-plus', '+'));
+        const label = el('span', 'tag-dd-name');
+        label.appendChild(document.createTextNode('Create “'));
+        label.appendChild(el('b', null, input.value.trim()));
+        label.appendChild(document.createTextNode('”'));
+        row.appendChild(label);
+        row.appendChild(el('span', 'tag-dd-new', 'new tag'));
+        row.addEventListener('click', () => addTag(input.value));
+        row.addEventListener('mousemove', () => {
+          activeIndex = rows.length;
+          paintActive();
+        });
+        list.appendChild(row);
+      }
+
+      if (!list.children.length) {
+        const empty = el('div', 'tag-dd-editor');
+        empty.appendChild(el('p', 'tag-ed-hint', vocab.length ? 'All tags are already on this issue.' : 'No tags in this project yet. Type to create the first one.'));
+        list.appendChild(empty);
+      }
+
+      dd.classList.toggle('open', open);
+      if (open) dd.scrollIntoView({ block: 'nearest' });
+    }
+
+    function paintActive() {
+      [...list.querySelectorAll('.tag-dd-row')].forEach((r, i) => r.classList.toggle('active', i === activeIndex));
+    }
+
+    function renderAll() {
+      renderChips();
+      renderRecent();
+      renderDropdown();
+    }
+
+    box.addEventListener('click', () => input.focus());
+    input.addEventListener('focus', () => {
+      open = true;
+      renderDropdown();
+    });
+    input.addEventListener('input', () => {
+      open = true;
+      activeIndex = query() ? 0 : -1;
+      renderDropdown();
+    });
+    input.addEventListener('keydown', (e) => {
+      const rowCount = list.querySelectorAll('.tag-dd-row').length;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        open = true;
+        activeIndex = Math.min(activeIndex + 1, rowCount - 1);
+        renderDropdown();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        activeIndex = Math.max(activeIndex - 1, 0);
+        renderDropdown();
+      } else if (e.key === 'Enter' || e.key === ',') {
+        e.preventDefault();
+        const rowEls = list.querySelectorAll('.tag-dd-row');
+        if (activeIndex >= 0 && rowEls[activeIndex]) rowEls[activeIndex].click();
+        else if (query()) addTag(input.value);
+      } else if (e.key === 'Escape') {
+        if (open) e.stopPropagation(); // eat it so the modal stays open
+        open = false;
+        editing = null;
+        renderDropdown();
+      } else if (e.key === 'Backspace' && !input.value && selected.length) {
+        removeTag(selected[selected.length - 1]);
+      }
+    });
+
+    // Click-outside closes the dropdown. Self-detaches once the modal is gone.
+    function onDocMousedown(e) {
+      if (!root.isConnected) {
+        document.removeEventListener('mousedown', onDocMousedown);
+        return;
+      }
+      if (!root.contains(e.target) && (open || editing)) {
+        open = false;
+        editing = null;
+        renderDropdown();
+      }
+    }
+    document.addEventListener('mousedown', onDocMousedown);
+
+    api(tagsUrl)
+      .then((t) => {
+        vocab = t;
+        renderRecent();
+        if (open) renderDropdown();
+      })
+      .catch(() => {}); // no vocabulary is fine; the field still takes new tags
+
+    return {
+      root,
+      // Selected chips plus whatever is still typed in the field, so an
+      // uncommitted tag isn't lost when the user goes straight to submit.
+      getTags() {
+        const leftovers = input.value.split(',').map((s) => s.trim()).filter(Boolean);
+        return [...new Set([...selected, ...leftovers.map((n) => knownName(n) || n)])];
+      },
+    };
+  }
+
   // ---- new issue modal ----------------------------------------------------
 
   document.getElementById('new-issue').addEventListener('click', () => {
@@ -795,10 +1155,9 @@
     body.appendChild(sevRow);
 
     const tagsRow = el('div', 'form-row');
-    tagsRow.appendChild(el('span', 'form-label', 'Tags (comma-separated)'));
-    const tags = el('input', 'form-input');
-    tags.placeholder = 'roadmap, ux';
-    tagsRow.appendChild(tags);
+    tagsRow.appendChild(el('span', 'form-label', 'Tags'));
+    const tags = tagField(state.projectKey);
+    tagsRow.appendChild(tags.root);
     body.appendChild(tagsRow);
 
     const error = el('div', 'form-error', '');
@@ -840,7 +1199,7 @@
             title: title.value.trim(),
             type: selectedType,
             severity: selectedSev,
-            tags: tags.value.split(',').map((t) => t.trim()).filter(Boolean),
+            tags: tags.getTags(),
             seeing: seeing.value,
             expecting: expecting.value,
             context: { source: 'tracker-ui', capturedAt: new Date().toISOString() },

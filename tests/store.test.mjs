@@ -20,6 +20,9 @@ import {
   iceboxIssue,
   reviveIssue,
   listIcebox,
+  listTags,
+  renameTag,
+  deleteTag,
 } from '../lib/store.mjs';
 
 function tmpDataDir() {
@@ -431,4 +434,70 @@ test('searchIssues matches across fields, optionally filtered and including clos
   sweepDone(dir, 'p');
   assert.ok(!searchIssues(dir, { query: 'Login button' }).some((i) => i.id === a.id), 'closed excluded by default');
   assert.ok(searchIssues(dir, { query: 'Login button', includeClosed: true }).some((i) => i.id === a.id));
+});
+
+test('listTags aggregates per project across open, icebox, and closed issues', () => {
+  const dir = tmpDataDir();
+  const a = createIssue(dir, { project: 'p', title: 'a', seeing: 's', expecting: 'e', tags: ['ux', 'widget', 'ux'] });
+  const b = createIssue(dir, { project: 'p', title: 'b', seeing: 's', expecting: 'e', tags: ['ux'] });
+  const c = createIssue(dir, { project: 'p', title: 'c', seeing: 's', expecting: 'e', tags: ['widget'] });
+  createIssue(dir, { project: 'other', title: 'x', seeing: 's', expecting: 'e', tags: ['ux', 'elsewhere'] });
+
+  iceboxIssue(dir, b.id); // iceboxed issues still count toward the vocabulary
+  updateIssue(dir, c.id, { status: 'done' });
+  sweepDone(dir, 'p'); // so do closed ones
+
+  const vocab = listTags(dir, 'p');
+  assert.deepEqual(vocab.map((t) => [t.name, t.count]), [['ux', 2], ['widget', 2]], 'duplicate tags within one issue count once');
+  assert.ok(vocab.every((t) => t.lastUsed), 'lastUsed is stamped from issue timestamps');
+  assert.deepEqual(listTags(dir, 'other').map((t) => t.name).sort(), ['elsewhere', 'ux'], 'vocabulary is per project');
+  assert.deepEqual(listTags(dir, 'empty-project'), []);
+  assert.equal(getIssue(dir, a.id).tags.length, 3, 'listTags never rewrites issue files');
+});
+
+test('renameTag renames everywhere; renaming onto an existing tag merges and dedupes', () => {
+  const dir = tmpDataDir();
+  const a = createIssue(dir, { project: 'p', title: 'a', seeing: 's', expecting: 'e', tags: ['ui', 'perf'] });
+  const b = createIssue(dir, { project: 'p', title: 'b', seeing: 's', expecting: 'e', tags: ['ui', 'ux'] });
+  const c = createIssue(dir, { project: 'p', title: 'c', seeing: 's', expecting: 'e', tags: ['perf'] });
+  const beforeUpdated = getIssue(dir, a.id).updated;
+
+  const renamed = renameTag(dir, 'p', 'perf', 'performance');
+  assert.deepEqual(renamed, { from: 'perf', to: 'performance', retagged: 2, merged: false });
+  assert.deepEqual(getIssue(dir, c.id).tags, ['performance']);
+
+  const merged = renameTag(dir, 'p', 'ui', 'ux');
+  assert.deepEqual(merged, { from: 'ui', to: 'ux', retagged: 2, merged: true });
+  assert.deepEqual(getIssue(dir, a.id).tags, ['ux', 'performance']);
+  assert.deepEqual(getIssue(dir, b.id).tags, ['ux'], 'an issue carrying both ends up with one deduped tag');
+  assert.equal(getIssue(dir, a.id).updated, beforeUpdated, 'tag gardening does not bump updated');
+
+  assert.throws(() => renameTag(dir, 'p', 'nope', 'x'), /Tag not found/);
+  assert.throws(() => renameTag(dir, 'p', 'ux', '  '), /tag name is required/);
+});
+
+test('renameTag reaches iceboxed and closed issues too', () => {
+  const dir = tmpDataDir();
+  const a = createIssue(dir, { project: 'p', title: 'a', seeing: 's', expecting: 'e', tags: ['old'] });
+  const b = createIssue(dir, { project: 'p', title: 'b', seeing: 's', expecting: 'e', tags: ['old'] });
+  iceboxIssue(dir, a.id);
+  updateIssue(dir, b.id, { status: 'done' });
+  sweepDone(dir, 'p');
+
+  assert.equal(renameTag(dir, 'p', 'old', 'new').retagged, 2);
+  assert.deepEqual(getIssue(dir, a.id).tags, ['new']);
+  assert.deepEqual(getIssue(dir, b.id).tags, ['new']);
+});
+
+test('deleteTag strips the tag from every issue in the project', () => {
+  const dir = tmpDataDir();
+  const a = createIssue(dir, { project: 'p', title: 'a', seeing: 's', expecting: 'e', tags: ['tmp', 'keep'] });
+  createIssue(dir, { project: 'p', title: 'b', seeing: 's', expecting: 'e', tags: ['tmp'] });
+  createIssue(dir, { project: 'other', title: 'x', seeing: 's', expecting: 'e', tags: ['tmp'] });
+
+  assert.deepEqual(deleteTag(dir, 'p', 'tmp'), { name: 'tmp', untagged: 2 });
+  assert.deepEqual(getIssue(dir, a.id).tags, ['keep']);
+  assert.deepEqual(listTags(dir, 'p').map((t) => t.name), ['keep']);
+  assert.deepEqual(listTags(dir, 'other').map((t) => t.name), ['tmp'], 'other projects untouched');
+  assert.throws(() => deleteTag(dir, 'p', 'tmp'), /Tag not found/);
 });

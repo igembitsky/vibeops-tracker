@@ -190,6 +190,27 @@
     '.it-input,.it-ta{width:100%;border:1px solid #d1d5db;border-radius:8px;padding:8px 10px;font-size:14px;color:#111827;background:#fff;}',
     '.it-ta{resize:vertical;}',
     '.it-input:focus,.it-ta:focus{outline:2px solid #6366f1;outline-offset:-1px;}',
+    '.it-tagbox{display:flex;flex-wrap:wrap;align-items:center;gap:5px;border:1px solid #d1d5db;border-radius:8px;padding:5px 8px;background:#fff;cursor:text;}',
+    '.it-tagbox:focus-within{outline:2px solid #6366f1;outline-offset:-1px;}',
+    '.it-tagbox .it-tags{flex:1;min-width:80px;border:none;outline:none;padding:3px 2px;font-size:14px;color:#111827;background:none;}',
+    '.it-chip{display:inline-flex;align-items:center;gap:4px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:999px;padding:1px 4px 1px 9px;font-size:12.5px;color:#374151;}',
+    '.it-chip-x{background:none;border:none;color:#6b7280;cursor:pointer;font-size:13px;line-height:1;padding:2px 4px;border-radius:999px;}',
+    '.it-chip-x:hover{color:#111827;background:rgba(0,0,0,.06);}',
+    '.it-dd{display:none;margin-top:5px;background:#fff;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.12);overflow:hidden;}',
+    '.it-dd.it-open{display:block;}',
+    '.it-dd-list{max-height:180px;overflow-y:auto;padding:4px;}',
+    '.it-dd-row{display:flex;align-items:center;gap:8px;padding:6px 9px;border-radius:7px;font-size:13.5px;color:#111827;cursor:pointer;}',
+    '.it-dd-row.it-active{background:#eef2ff;}',
+    '.it-dd-name b{color:#4f46e5;font-weight:600;}',
+    '.it-dd-count{margin-left:auto;color:#9ca3af;font-size:11px;font-variant-numeric:tabular-nums;}',
+    '.it-dd-create{border-top:1px solid #f3f4f6;}',
+    '.it-dd-plus{flex:none;width:18px;height:18px;border:1px dashed #16a34a;border-radius:999px;color:#16a34a;display:inline-flex;align-items:center;justify-content:center;font-size:13px;line-height:1;}',
+    '.it-dd-new{margin-left:auto;border:1px solid #16a34a;background:rgba(22,163,74,.07);color:#16a34a;border-radius:999px;padding:1px 8px;font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;}',
+    '.it-recent{display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-top:6px;}',
+    '.it-recent-label{color:#9ca3af;font-size:11px;margin-right:2px;}',
+    '.it-recent-chip{background:none;border:1px dashed #d1d5db;border-radius:999px;color:#6b7280;padding:2px 10px;font-size:12px;cursor:pointer;}',
+    '.it-recent-chip:hover{color:#111827;border-color:#9ca3af;}',
+    '.it-recent-chip span{color:#6366f1;margin-right:3px;}',
     '.it-sevs{display:flex;gap:6px;align-items:center;}',
     '.it-sev{width:26px;height:26px;border-radius:50%;border:1px solid #d1d5db;background:#fff;cursor:pointer;font-size:12px;color:#374151;}',
     '.it-sev.it-on{background:#dc2626;border-color:#dc2626;color:#fff;}',
@@ -263,6 +284,7 @@
     if (ui.dialog) ui.dialog.remove();
     ui.backdrop = ui.dialog = null;
     dragState = null;
+    tagOutsideClose = null;
     document.removeEventListener('keydown', onKeydown);
   }
 
@@ -312,7 +334,7 @@
         (title && title.value.trim()) ||
         (seeing && seeing.value.trim()) ||
         (expecting && expecting.value.trim()) ||
-        (tags && tags.value.trim())
+        (tags && tags.isDirty())
       );
     }
     function nudge() {
@@ -414,11 +436,11 @@
     body.appendChild(sevRow);
 
     var tagsRow = el('div', 'it-row');
-    tagsRow.appendChild(el('span', 'it-label', 'Tags (comma-separated)'));
-    var tags = el('input', 'it-input it-tags');
-    tags.placeholder = 'auth, ui, performance';
-    tagsRow.appendChild(tags);
+    tagsRow.appendChild(el('span', 'it-label', 'Tags'));
+    var tags = tagField();
+    tagsRow.appendChild(tags.root);
     body.appendChild(tagsRow);
+    tagOutsideClose = tags.outsideClose;
 
     if (captured.selection) {
       var selRow = el('div', 'it-row');
@@ -495,6 +517,315 @@
     );
   }
 
+  // ---- tag suggestions ------------------------------------------------------
+  // The board's tag field, minus vocabulary editing (rename / merge / delete
+  // live on the board; the tracker refuses cross-origin tag maintenance).
+  // Focusing lists the project's most-used tags with counts, typing filters
+  // them, an unknown name gets an explicit "new tag" row, and recently used
+  // tags sit under the field one click away. Picking a tag commits a chip and
+  // closes the list. The vocabulary fetch is best-effort: an offline tracker
+  // or an older server just means no suggestions, and the field still accepts
+  // comma-typed tags like before.
+
+  // Single module-level outside-click listener (like the drag listeners), so
+  // repeated dialog opens never accumulate document handlers.
+  var tagOutsideClose = null;
+  document.addEventListener(
+    'mousedown',
+    safe(function (e) {
+      if (tagOutsideClose) tagOutsideClose(e);
+    })
+  );
+
+  function tagField() {
+    var vocab = []; // [{name, count, lastUsed}] from the tracker
+    var selected = [];
+    var open = false;
+    var active = -1;
+
+    var root = el('div', 'it-tagfield');
+    var box = el('div', 'it-tagbox');
+    var input = el('input', 'it-tags');
+    input.placeholder = 'Type to search or create…';
+    input.setAttribute('autocomplete', 'off');
+    box.appendChild(input);
+    var dd = el('div', 'it-dd');
+    var list = el('div', 'it-dd-list');
+    dd.appendChild(list);
+    var recent = el('div', 'it-recent');
+    root.appendChild(box);
+    root.appendChild(dd);
+    root.appendChild(recent);
+
+    function query() {
+      return input.value.trim().toLowerCase();
+    }
+    function knownName(name) {
+      for (var i = 0; i < vocab.length; i++) {
+        if (vocab[i].name.toLowerCase() === name.toLowerCase()) return vocab[i].name;
+      }
+      return null;
+    }
+    function matches() {
+      var q = query();
+      return vocab
+        .filter(function (t) {
+          return selected.indexOf(t.name) === -1 && (!q || t.name.toLowerCase().indexOf(q) !== -1);
+        })
+        .sort(function (a, b) {
+          return b.count - a.count || a.name.localeCompare(b.name);
+        });
+    }
+
+    function addTag(name) {
+      name = name.replace(/,/g, '').trim();
+      if (!name) return;
+      name = knownName(name) || name;
+      if (selected.indexOf(name) === -1) selected.push(name);
+      input.value = '';
+      active = -1;
+      open = false;
+      renderAll();
+      try {
+        input.blur();
+      } catch (_) {}
+    }
+
+    function renderChips() {
+      box.querySelectorAll('.it-chip').forEach(function (c) {
+        c.remove();
+      });
+      selected.forEach(function (name) {
+        var chip = el('span', 'it-chip', name);
+        var x = el('button', 'it-chip-x', '×');
+        x.setAttribute('type', 'button');
+        x.setAttribute('aria-label', 'Remove tag ' + name);
+        x.addEventListener(
+          'click',
+          safe(function (e) {
+            e.stopPropagation();
+            selected = selected.filter(function (n) {
+              return n !== name;
+            });
+            renderAll();
+          })
+        );
+        chip.appendChild(x);
+        box.insertBefore(chip, input);
+      });
+    }
+
+    function renderRecent() {
+      while (recent.firstChild) recent.removeChild(recent.firstChild);
+      var latest = vocab
+        .filter(function (t) {
+          return selected.indexOf(t.name) === -1;
+        })
+        .sort(function (a, b) {
+          return String(b.lastUsed).localeCompare(String(a.lastUsed));
+        })
+        .slice(0, 6);
+      if (!latest.length) return;
+      recent.appendChild(el('span', 'it-recent-label', 'Recent:'));
+      latest.forEach(function (t) {
+        var b = el('button', 'it-recent-chip');
+        b.setAttribute('type', 'button');
+        b.appendChild(el('span', null, '+'));
+        b.appendChild(document.createTextNode(t.name));
+        b.addEventListener(
+          'click',
+          safe(function () {
+            addTag(t.name);
+          })
+        );
+        recent.appendChild(b);
+      });
+    }
+
+    function highlightName(name) {
+      var holder = el('span', 'it-dd-name');
+      var q = query();
+      var i = q ? name.toLowerCase().indexOf(q) : -1;
+      if (i < 0) {
+        holder.textContent = name;
+        return holder;
+      }
+      holder.appendChild(document.createTextNode(name.slice(0, i)));
+      holder.appendChild(el('b', null, name.slice(i, i + q.length)));
+      holder.appendChild(document.createTextNode(name.slice(i + q.length)));
+      return holder;
+    }
+
+    function paintActive() {
+      var rows = list.querySelectorAll('.it-dd-row');
+      for (var i = 0; i < rows.length; i++) rows[i].classList.toggle('it-active', i === active);
+    }
+
+    function renderDd() {
+      while (list.firstChild) list.removeChild(list.firstChild);
+      var rows = matches();
+      var q = query();
+      var creatable =
+        q &&
+        !knownName(q) &&
+        !selected.some(function (n) {
+          return n.toLowerCase() === q;
+        });
+      active = Math.min(active, rows.length - (creatable ? 0 : 1));
+
+      rows.forEach(function (t, i) {
+        var row = el('div', 'it-dd-row' + (i === active ? ' it-active' : ''));
+        row.appendChild(highlightName(t.name));
+        row.appendChild(el('span', 'it-dd-count', String(t.count)));
+        row.addEventListener(
+          'click',
+          safe(function () {
+            addTag(t.name);
+          })
+        );
+        row.addEventListener(
+          'mousemove',
+          safe(function () {
+            if (active !== i) {
+              active = i;
+              paintActive();
+            }
+          })
+        );
+        list.appendChild(row);
+      });
+
+      if (creatable) {
+        var createRow = el('div', 'it-dd-row it-dd-create' + (active === rows.length ? ' it-active' : ''));
+        createRow.appendChild(el('span', 'it-dd-plus', '+'));
+        var label = el('span', 'it-dd-name');
+        label.appendChild(document.createTextNode('Create “'));
+        label.appendChild(el('b', null, input.value.trim()));
+        label.appendChild(document.createTextNode('”'));
+        createRow.appendChild(label);
+        createRow.appendChild(el('span', 'it-dd-new', 'new tag'));
+        createRow.addEventListener(
+          'click',
+          safe(function () {
+            addTag(input.value);
+          })
+        );
+        createRow.addEventListener(
+          'mousemove',
+          safe(function () {
+            active = rows.length;
+            paintActive();
+          })
+        );
+        list.appendChild(createRow);
+      }
+
+      // Nothing to suggest and nothing typed: keep the list closed rather than
+      // showing an empty box.
+      dd.classList.toggle('it-open', open && !!list.children.length);
+    }
+
+    function renderAll() {
+      renderChips();
+      renderRecent();
+      renderDd();
+    }
+
+    box.addEventListener(
+      'click',
+      safe(function () {
+        try {
+          input.focus();
+        } catch (_) {}
+      })
+    );
+    input.addEventListener(
+      'focus',
+      safe(function () {
+        open = true;
+        renderDd();
+      })
+    );
+    input.addEventListener(
+      'input',
+      safe(function () {
+        open = true;
+        active = query() ? 0 : -1;
+        renderDd();
+      })
+    );
+    input.addEventListener(
+      'keydown',
+      safe(function (e) {
+        var rowCount = list.querySelectorAll('.it-dd-row').length;
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          open = true;
+          active = Math.min(active + 1, rowCount - 1);
+          renderDd();
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          active = Math.max(active - 1, 0);
+          renderDd();
+        } else if (e.key === 'Enter' || e.key === ',') {
+          e.preventDefault();
+          var rows = list.querySelectorAll('.it-dd-row');
+          if (active >= 0 && rows[active]) rows[active].click();
+          else if (query()) addTag(input.value);
+        } else if (e.key === 'Escape') {
+          if (open && list.children.length) e.stopPropagation(); // eat it so the dialog stays open
+          open = false;
+          renderDd();
+        } else if (e.key === 'Backspace' && !input.value && selected.length) {
+          selected.pop();
+          renderAll();
+        }
+      })
+    );
+
+    window
+      .fetch(endpoint + '/api/projects/' + encodeURIComponent(project) + '/tags')
+      .then(function (res) {
+        return res.ok ? res.json() : [];
+      })
+      .then(
+        safe(function (data) {
+          if (!Array.isArray(data)) return;
+          vocab = data.filter(function (t) {
+            return t && typeof t.name === 'string';
+          });
+          renderRecent();
+          if (open) renderDd();
+        })
+      )
+      .catch(function (_) {});
+
+    return {
+      root: root,
+      isDirty: function () {
+        return !!(selected.length || input.value.trim());
+      },
+      outsideClose: function (e) {
+        if (open && !root.contains(e.target)) {
+          open = false;
+          renderDd();
+        }
+      },
+      // Selected chips plus whatever is still typed in the field, so an
+      // uncommitted tag isn't lost when the reporter goes straight to submit.
+      getTags: function () {
+        var out = selected.slice();
+        input.value.split(',').forEach(function (part) {
+          var name = part.trim();
+          if (!name) return;
+          name = knownName(name) || name;
+          if (out.indexOf(name) === -1) out.push(name);
+        });
+        return out;
+      },
+    };
+  }
+
   function doSubmit(f) {
     var seeing = f.seeing.value.trim();
     var expecting = f.expecting.value.trim();
@@ -510,10 +841,7 @@
       title: f.title.value.trim(),
       type: state.selectedType,
       severity: state.selectedSeverity,
-      tags: f.tags.value
-        .split(',')
-        .map(function (t) { return t.trim(); })
-        .filter(Boolean),
+      tags: f.tags.getTags(),
       seeing: seeing,
       expecting: expecting,
       context: snapshot({ trail: f.trail ? f.trail.checked : true, selection: f.captured ? f.captured.selection : null }),
