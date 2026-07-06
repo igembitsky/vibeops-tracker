@@ -66,10 +66,30 @@ export function startServer({ port = 4400, dataDir }) {
   });
 }
 
+// A long-lived local server must not die on a stray exception. Request handling
+// is already try/caught per request, so anything reaching these handlers is
+// out-of-band (a timer, an fs callback); log it and keep serving. Installed by
+// the entrypoints, not at import time, so tests that import startServer keep
+// Node's default fail-fast behavior.
+export function installCrashGuards() {
+  process.on('uncaughtException', (err) => console.error('[issue-tracker] uncaught exception:', err));
+  process.on('unhandledRejection', (err) => console.error('[issue-tracker] unhandled rejection:', err));
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  installCrashGuards();
   const port = Number(process.env.PORT) || 4400;
   const dataDir = resolveDataDir();
-  startServer({ port, dataDir }).then(() => {
-    console.log(`VibeOps Tracker running at http://localhost:${port} (data: ${dataDir})`);
-  });
+  startServer({ port, dataDir })
+    .then(() => {
+      console.log(`VibeOps Tracker running at http://localhost:${port} (data: ${dataDir})`);
+    })
+    .catch((err) => {
+      if (err && err.code === 'EADDRINUSE') {
+        console.error(`[issue-tracker] port ${port} is already in use (is the tracker already running?). Set PORT to use another port.`);
+      } else {
+        console.error('[issue-tracker] failed to start:', err);
+      }
+      process.exit(1);
+    });
 }

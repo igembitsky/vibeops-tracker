@@ -165,6 +165,23 @@ vibeops mcp             # run the MCP stdio server directly
 vibeops --help
 ```
 
+### Keep it running (macOS)
+
+A tracker started from a terminal tab (or an agent session) dies when that tab
+closes. To make it a permanent fixture instead:
+
+```bash
+vibeops service install     # starts at login, restarts if it ever dies
+vibeops service status
+vibeops service uninstall
+```
+
+This registers a per-user launchd agent, so there is nothing to remember to
+start. It pins the current Node binary and checkout path into the agent, so
+re-run `install` after upgrading Node or moving the repo. Logs go to
+`~/Library/Logs/vibeops-tracker.log`. On Linux, run `vibeops` under a systemd
+user unit with `Restart=always`.
+
 ## FAQ
 
 **Is my data private?** Yes, completely. Everything lives on your machine in

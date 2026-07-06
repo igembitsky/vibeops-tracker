@@ -17,6 +17,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   per browser via a last-seen timestamp so each card is only ever flagged once.
 - **Backlog sort.** A subtle toggle in the Backlog header sorts by created date,
   newest or oldest first, and remembers your choice.
+- **Run it as a login service.** `vibeops service install` registers a macOS
+  launchd agent (RunAtLoad + KeepAlive): the tracker starts at login and
+  restarts automatically if it ever dies, so a closed terminal or agent
+  session can't take the board down. `service status` and `service uninstall`
+  manage it; logs land in `~/Library/Logs/vibeops-tracker.log`. The server
+  also gained crash guards (stray out-of-band exceptions are logged, not
+  fatal) and a clear message when the port is already in use.
 - **Smart tag input.** The tags field, in the capture widget and in the
   board's new-issue modal, is now chips with typeahead over the project's
   existing tags (with usage counts), a "Recent:" row of one-click tags, and an
