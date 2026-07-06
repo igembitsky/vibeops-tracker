@@ -203,6 +203,34 @@ test('Escape closes the dialog', () => {
   assert.equal(document.querySelector('.it-dialog'), null);
 });
 
+test('keystrokes typed in the dialog never reach host page shortcut handlers', () => {
+  const { window, document } = loadWidget();
+  let hostSaw = 0;
+  document.addEventListener('keydown', (e) => {
+    if (e.key.startsWith('Arrow')) {
+      hostSaw++;
+      e.preventDefault(); // hosts do this, which kills shift+arrow selection in our fields
+    }
+  });
+  openDialog(document);
+  const ta = document.querySelector('.it-seeing');
+  ta.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'ArrowDown', shiftKey: true, bubbles: true, cancelable: true }));
+  ta.dispatchEvent(new window.KeyboardEvent('keyup', { key: 'ArrowDown', bubbles: true }));
+  assert.equal(hostSaw, 0, 'host shortcut handler must not see keys typed in the dialog');
+
+  // Outside the dialog the host page keeps its shortcuts.
+  document.body.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+  assert.equal(hostSaw, 1, 'host shortcuts still work when focus is outside the dialog');
+});
+
+test('Escape typed inside a dialog field still closes the dialog', () => {
+  const { window, document } = loadWidget();
+  openDialog(document);
+  const ta = document.querySelector('.it-seeing');
+  ta.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  assert.equal(document.querySelector('.it-dialog'), null);
+});
+
 test('a backdrop click with a typed draft keeps the dialog open (draft is not lost)', () => {
   const { document } = loadWidget();
   openDialog(document);

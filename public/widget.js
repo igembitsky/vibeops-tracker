@@ -417,6 +417,21 @@
     d.setAttribute('role', 'dialog');
     d.setAttribute('aria-label', 'Report an issue');
 
+    // Keystrokes typed in the dialog stay in the dialog. Host pages often bind
+    // document-level shortcuts (arrow-key navigation and the like) that
+    // preventDefault, which silently kills native editing such as shift+arrow
+    // selection in our fields. Escape is handled here because the document
+    // listener behind it never sees keys pressed inside the dialog anymore.
+    ['keydown', 'keyup', 'keypress'].forEach(function (type) {
+      d.addEventListener(
+        type,
+        safe(function (e) {
+          if (type === 'keydown' && e.key === 'Escape') closeDialog();
+          e.stopPropagation();
+        })
+      );
+    });
+
     var head = el('div', 'it-head');
     head.appendChild(el('b', null, 'Report an issue'));
     var x = el('button', 'it-btn it-cancel', '×');
