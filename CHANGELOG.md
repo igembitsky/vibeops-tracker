@@ -8,6 +8,27 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Linked issues (related + duplicate).** Issues can now be connected with typed,
+  two-sided links, written to both markdown files at once so each stays
+  self-describing. `related` (symmetric) marks issues that share a surface and
+  should be worked together; `duplicate_of` / `duplicated_by` marks a duplicate
+  and its canonical survivor. The drawer gets a grouped Links section with an
+  inline typeahead picker (search this project's open issues, pick a
+  relationship, link or unlink), and board cards show a chain-glyph link count.
+  New MCP tools `link_issues` / `unlink_issues`, enriched `get_issue` links, and
+  the same in the REST API (`PATCH`/`DELETE /api/issues/:id/links`). The agent
+  doctrine (and the copy-prompt) now carry two rules: **duplicates get cleaned
+  out** (do the work on the survivor, resolve/delete the duplicate) and
+  **related work gets batched** (handle what shares the change together and move
+  it through the board as one). Replaces the old single-scalar `related_to`,
+  which still reads as one `related` link (non-destructive migration).
+
+### Changed
+
+- The `update_issue` MCP tool no longer takes `related_to`; use `link_issues`
+  instead. `create_issue`'s `relatedTo` still works and now creates a proper
+  two-sided related link.
+
 - **Point at the element.** The capture dialog gained a "Point at the element on
   the page" mode: the dialog steps aside, you click the element the report is
   about, and the issue carries a machine-usable pointer (selector path, tag,

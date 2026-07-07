@@ -17,6 +17,13 @@
   --heat-amber: #eab308;
   --heat-stale: #ef4444;
   --new: #22c55e;
+  --faint: #5b6472;
+  /* Status accents, matched to the board columns (used by link status dots). */
+  --st-backlog: #5b6472;
+  --st-ondeck: #3b82f6;
+  --st-progress: #f59e0b;
+  --st-review: #a855f7;
+  --st-done: #22c55e;
 }
 
 * { box-sizing: border-box; }
@@ -588,6 +595,58 @@ body {
 .drawer-close:hover { color: var(--text); }
 
 .drawer-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0 4px; }
+
+/* ---- issue links: drawer section, picker, and the board card chip ---- */
+.dsection-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 9px; }
+.dsection-lbl { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; }
+.dsection-lbl svg { width: 14px; height: 14px; color: var(--muted); flex: 0 0 auto; }
+.dsection-cnt { background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); border-radius: 999px; font-size: 10.5px; padding: 0 7px; font-variant-numeric: tabular-nums; }
+
+.addlink { display: inline-flex; align-items: center; gap: 6px; background: var(--panel-2); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 5px 11px; font: inherit; font-size: 12.5px; cursor: pointer; transition: border-color .12s; }
+.addlink:hover { border-color: var(--accent); }
+.addlink svg { width: 13px; height: 13px; color: var(--muted); flex: 0 0 auto; }
+
+.relgroup { margin-bottom: 12px; }
+.relgroup:last-child { margin-bottom: 0; }
+.relgroup-h { font-size: 10px; text-transform: uppercase; letter-spacing: .11em; color: var(--faint); font-weight: 600; margin: 0 0 6px 2px; }
+.linkrow { display: flex; align-items: center; gap: 10px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; padding: 8px 11px; margin-bottom: 6px; cursor: pointer; transition: border-color .12s; }
+.linkrow:last-child { margin-bottom: 0; }
+.linkrow:hover { border-color: var(--accent); }
+.linkrow .lid { font-family: ui-monospace, monospace; font-size: 12px; color: var(--muted); flex: 0 0 auto; }
+.linkrow .ltitle { font-size: 13px; color: var(--text); flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.linkrow .pill { flex: 0 0 auto; }
+.linkrow .unlink { flex: 0 0 auto; background: none; border: none; color: var(--faint); font-size: 16px; line-height: 1; cursor: pointer; border-radius: 6px; padding: 2px 5px; opacity: 0; transition: .12s; }
+.linkrow:hover .unlink, .linkrow .unlink:focus-visible { opacity: 1; }
+.linkrow .unlink:hover { color: var(--sev5); background: rgba(239, 68, 68, .12); }
+.links-empty { color: var(--faint); font-size: 12.5px; padding: 2px 2px 4px; }
+
+.sdot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; box-shadow: 0 0 0 3px rgba(255, 255, 255, .03); }
+
+.picker { margin-top: 10px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 11px; padding: 12px; }
+.picker-lbl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--faint); font-weight: 600; margin: 0 0 7px; }
+.relpills { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 11px; }
+.relpill { border: 1px solid var(--border); background: var(--panel); color: var(--muted); border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 12.5px; cursor: pointer; transition: color .12s; }
+.relpill:hover { color: var(--text); }
+.relpill.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.pick-search input { width: 100%; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font: inherit; font-size: 13px; padding: 8px 11px; }
+.pick-search input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.pick-search input::placeholder { color: var(--faint); }
+.pick-dd { margin-top: 8px; max-height: 214px; overflow-y: auto; }
+.pick-dd:not(:empty) { border: 1px solid var(--border); border-radius: 9px; background: var(--panel); padding: 4px; }
+.pick-row { display: flex; align-items: center; gap: 9px; padding: 7px 9px; border-radius: 7px; cursor: pointer; }
+.pick-row.active { background: rgba(99, 102, 241, .16); }
+.pick-row .lid { font-family: ui-monospace, monospace; font-size: 12px; color: var(--muted); flex: 0 0 auto; }
+.pick-row .ltitle { font-size: 12.5px; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-row .pill { flex: 0 0 auto; }
+.pick-none { color: var(--faint); font-size: 12.5px; padding: 9px; }
+.pick-hint { display: flex; gap: 12px; margin-top: 9px; color: var(--faint); font-size: 11px; }
+.pick-hint kbd { font-family: ui-monospace, monospace; font-size: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; margin-right: 2px; }
+
+/* Board card chip: a chain glyph + link count, pushed to the right of the top row. */
+.linkchip { display: inline-flex; align-items: center; gap: 3px; margin-left: auto; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px 1px 6px; background: var(--panel); }
+.linkchip svg { width: 11px; height: 11px; color: var(--faint); }
+.linkchip.dup { border-color: rgba(148, 163, 184, .5); color: #cbd5e1; }
+.linkchip.dup svg { color: #cbd5e1; }
 
 /* Both timestamps, spelled out (created is board-hidden, so it lives here). */
 .drawer-times { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 8px 0 2px; font-size: 12.5px; }

@@ -12,6 +12,25 @@
   const TYPES = ['bug', 'improvement', 'feature', 'other'];
   const POLL_MS = 5000;
 
+  // Issue links. Groups render in this order (duplicates read first, then related).
+  const STATUS_COLOR = {
+    backlog: 'var(--st-backlog)',
+    'on-deck': 'var(--st-ondeck)',
+    'in-progress': 'var(--st-progress)',
+    'in-review': 'var(--st-review)',
+    done: 'var(--st-done)',
+  };
+  const LINK_GROUPS = [
+    { rel: 'duplicate_of', label: 'Duplicate of' },
+    { rel: 'duplicated_by', label: 'Duplicated by' },
+    { rel: 'related', label: 'Related to' },
+  ];
+  const PICK_RELS = [
+    { rel: 'related', label: 'Related to' },
+    { rel: 'duplicate_of', label: 'Duplicate of' },
+    { rel: 'duplicated_by', label: 'Duplicated by' },
+  ];
+
   const state = {
     projects: [],
     projectKey: localStorage.getItem('it-project') || null,
@@ -79,6 +98,16 @@
   }
   function checkGlyph() {
     return svgIcon([svgPath('M20 6L9 17l-5-5')]);
+  }
+  function linkGlyph() {
+    // A chain link (feather "link"). Sized down per context via CSS.
+    return svgIcon([
+      svgPath('M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71'),
+      svgPath('M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71'),
+    ]);
+  }
+  function plusGlyph() {
+    return svgIcon([svgPath('M12 5v14'), svgPath('M5 12h14')]);
   }
 
   // A tiny copy button that sits next to a ticket id. stopPropagation keeps a
@@ -357,6 +386,7 @@
     if (isNew(issue)) top.appendChild(el('span', 'new-dot'));
     top.appendChild(el('span', 'card-id', issue.id));
     top.appendChild(copyRefBtn(issue));
+    if (issue.links?.length) top.appendChild(linkChip(issue));
     top.appendChild(activityAge(issue));
     card.appendChild(top);
 
@@ -512,6 +542,230 @@
     refresh();
   }
 
+  // ---- issue links --------------------------------------------------------
+  // The drawer shows a grouped Links section (duplicates first, then related);
+  // each row jumps to that issue. The picker searches the current project's open
+  // issues. Links are two-sided on the server, so after any link/unlink we just
+  // reopen the drawer (fresh, enriched links) and refresh the board (count chip).
+
+  // Board card chip: a chain glyph + count, muted-distinct when a duplicate is
+  // involved. Reads raw links (listIssues does not enrich), which carry rel + to.
+  function linkChip(issue) {
+    const n = issue.links.length;
+    const isDup = issue.links.some((l) => l.rel === 'duplicate_of' || l.rel === 'duplicated_by');
+    const chip = el('span', 'linkchip' + (isDup ? ' dup' : ''));
+    chip.appendChild(linkGlyph());
+    chip.appendChild(el('span', null, String(n)));
+    chip.title = `${n} linked issue${n === 1 ? '' : 's'}`;
+    return chip;
+  }
+
+  function statusDot(status) {
+    const d = el('span', 'sdot');
+    d.style.background = STATUS_COLOR[status] || 'var(--muted)';
+    d.title = (STATUSES.find((s) => s.key === status) || {}).label || status;
+    return d;
+  }
+
+  // One row in the drawer's Links section. `link` is enriched (rel/to/title/type/status).
+  function linkRow(sourceId, link, readOnly) {
+    const row = el('div', 'linkrow');
+    row.appendChild(statusDot(link.status));
+    row.appendChild(el('span', 'lid', link.to));
+    row.appendChild(el('span', 'ltitle', link.title || '(untitled)'));
+    if (link.type) row.appendChild(el('span', `pill pill-type-${link.type}`, link.type));
+    if (!readOnly) {
+      const x = el('button', 'unlink', '×');
+      x.type = 'button';
+      x.title = 'Unlink';
+      x.setAttribute('aria-label', `Unlink ${link.to}`);
+      x.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        try {
+          await api(`/api/issues/${encodeURIComponent(sourceId)}/links/${encodeURIComponent(link.to)}`, { method: 'DELETE' });
+          openDrawer(sourceId);
+          refresh();
+        } catch (err) {
+          console.warn('unlink failed', err);
+        }
+      });
+      row.appendChild(x);
+    }
+    row.addEventListener('click', () => openDrawer(link.to));
+    return row;
+  }
+
+  function linksSection(issue) {
+    const readOnly = !!issue.closed || !!issue.iceboxed;
+    const links = issue.links || [];
+    const wrap = el('div', 'section dsection');
+
+    const head = el('div', 'dsection-h');
+    const lbl = el('span', 'dsection-lbl');
+    lbl.appendChild(linkGlyph());
+    lbl.appendChild(document.createTextNode('Links'));
+    lbl.appendChild(el('span', 'dsection-cnt', String(links.length)));
+    head.appendChild(lbl);
+
+    let picker = null;
+    if (!readOnly) {
+      const add = el('button', 'addlink');
+      add.type = 'button';
+      add.appendChild(plusGlyph());
+      add.appendChild(document.createTextNode('Link issue'));
+      add.addEventListener('click', () => {
+        if (picker && picker.isConnected) {
+          picker.remove();
+          picker = null;
+          return;
+        }
+        picker = buildPicker(issue);
+        wrap.appendChild(picker);
+        picker.querySelector('input')?.focus();
+      });
+      head.appendChild(add);
+    }
+    wrap.appendChild(head);
+
+    if (!links.length) {
+      wrap.appendChild(el('div', 'links-empty', readOnly ? 'No links.' : 'No links yet. Use “Link issue” to connect a related or duplicate ticket.'));
+    } else {
+      for (const g of LINK_GROUPS) {
+        const inGroup = links.filter((l) => l.rel === g.rel);
+        if (!inGroup.length) continue;
+        const grp = el('div', 'relgroup');
+        grp.appendChild(el('div', 'relgroup-h', g.label));
+        for (const l of inGroup) grp.appendChild(linkRow(issue.id, l, readOnly));
+        wrap.appendChild(grp);
+      }
+    }
+    return wrap;
+  }
+
+  // Inline typeahead: pick a relationship, then an issue from this project's open
+  // board (self and already-linked excluded). Reuses the tag-field interaction feel.
+  function buildPicker(issue) {
+    let currentRel = 'related';
+    let query = '';
+    let active = 0;
+
+    const p = el('div', 'picker');
+    p.appendChild(el('div', 'picker-lbl', 'Relationship'));
+    const pills = el('div', 'relpills');
+    for (const r of PICK_RELS) {
+      const b = el('button', 'relpill' + (r.rel === currentRel ? ' on' : ''), r.label);
+      b.type = 'button';
+      b.addEventListener('click', () => {
+        currentRel = r.rel;
+        [...pills.children].forEach((x, i) => x.classList.toggle('on', PICK_RELS[i].rel === currentRel));
+        input.focus();
+      });
+      pills.appendChild(b);
+    }
+    p.appendChild(pills);
+
+    const searchWrap = el('div', 'pick-search');
+    const input = el('input');
+    input.type = 'text';
+    input.placeholder = 'Search issues by id or title…';
+    input.autocomplete = 'off';
+    searchWrap.appendChild(input);
+    p.appendChild(searchWrap);
+
+    const dd = el('div', 'pick-dd');
+    p.appendChild(dd);
+
+    const hint = el('div', 'pick-hint');
+    for (const [keys, label] of [[['↑', '↓'], 'navigate'], [['↵'], 'link'], [['esc'], 'close']]) {
+      const span = el('span');
+      for (const k of keys) span.appendChild(el('kbd', null, k));
+      span.appendChild(document.createTextNode(` ${label}`));
+      hint.appendChild(span);
+    }
+    p.appendChild(hint);
+
+    function candidates() {
+      const q = query.trim().toLowerCase();
+      const taken = new Set((issue.links || []).map((l) => l.to));
+      return state.issues
+        .filter((i) => i.id !== issue.id && !taken.has(i.id) && (!q || `${i.id} ${i.title || ''}`.toLowerCase().includes(q)))
+        .slice(0, 40);
+    }
+
+    async function add(id) {
+      try {
+        await api(`/api/issues/${encodeURIComponent(issue.id)}/links`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to: id, rel: currentRel }),
+        });
+        openDrawer(issue.id);
+        refresh();
+      } catch (err) {
+        console.warn('link failed', err);
+      }
+    }
+
+    function paint() {
+      [...dd.querySelectorAll('.pick-row')].forEach((r, i) => r.classList.toggle('active', i === active));
+    }
+
+    function renderDD() {
+      dd.replaceChildren();
+      const rows = candidates();
+      if (active > rows.length - 1) active = Math.max(0, rows.length - 1);
+      if (!rows.length) {
+        dd.appendChild(el('div', 'pick-none', query.trim() ? `No open issues match “${query.trim()}”.` : 'No other open issues to link.'));
+        return;
+      }
+      rows.forEach((iss, idx) => {
+        const row = el('div', 'pick-row' + (idx === active ? ' active' : ''));
+        row.appendChild(statusDot(iss.status));
+        row.appendChild(el('span', 'lid', iss.id));
+        row.appendChild(el('span', 'ltitle', iss.title || (iss.seeing || '').slice(0, 60) || '(untitled)'));
+        if (iss.type) row.appendChild(el('span', `pill pill-type-${iss.type}`, iss.type));
+        row.addEventListener('mousemove', () => {
+          if (active !== idx) {
+            active = idx;
+            paint();
+          }
+        });
+        row.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          add(iss.id);
+        });
+        dd.appendChild(row);
+      });
+    }
+
+    input.addEventListener('input', () => {
+      query = input.value;
+      active = 0;
+      renderDD();
+    });
+    input.addEventListener('keydown', (e) => {
+      const rows = candidates();
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        active = Math.min(active + 1, rows.length - 1);
+        renderDD();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        active = Math.max(active - 1, 0);
+        renderDD();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (rows[active]) add(rows[active].id);
+      } else if (e.key === 'Escape') {
+        e.stopPropagation(); // keep the drawer open
+        p.remove();
+      }
+    });
+
+    renderDD();
+    return p;
+  }
+
   // ---- drawer -------------------------------------------------------------
 
   function closeDrawer() {
@@ -599,10 +853,11 @@
       meta.appendChild(patchPill('severity', issue.severity, `pill-sev pill-sev-${issue.severity}`, [1, 2, 3, 4, 5].map((s) => ({ value: s, label: `Severity ${s}` }))));
     }
     for (const tag of issue.tags || []) meta.appendChild(el('span', 'tag', tag));
-    if (issue.relatedTo) meta.appendChild(el('span', 'tag', `related: ${issue.relatedTo}`));
     if (issue.closed) meta.appendChild(el('span', 'pill pill-closed', `archived ${new Date(issue.closed).toLocaleDateString()}`));
     else if (issue.iceboxed) meta.appendChild(el('span', 'pill pill-iceboxed', `iceboxed ${new Date(issue.iceboxed).toLocaleDateString()}`));
     $drawer.appendChild(meta);
+
+    $drawer.appendChild(linksSection(issue));
 
     // Both timestamps live here; the board card shows only the last-activity age.
     const times = el('div', 'drawer-times');
