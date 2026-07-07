@@ -20,6 +20,7 @@ import {
   deleteIssue,
   iceboxIssue,
   reviveIssue,
+  listTags,
 } from './lib/store.mjs';
 import { resolveDataDir } from './lib/data-dir.mjs';
 
@@ -78,6 +79,11 @@ Workflow:
 7. File new issues you notice with create_issue (seeing/expecting required).
 
 Statuses: ${STATUSES.join(' | ')}. Severity 1 (cosmetic) to 5 (blocker).
+Tags are per project and free-form, and the vocabulary only stays useful if it stays
+tight. Before tagging anything (create_issue or update_issue), call list_tags {project}
+and reuse an existing tag whenever one fits; the counts show the established vocabulary.
+Invent a new tag only when nothing existing covers it, and never add a near-duplicate of
+an existing tag (e.g. "ui" when "ux" exists); humans merge duplicates from the board.
 The icebox parks deferred backlog items: they keep their content but are hidden from
 list_issues. Park a backlog item with icebox_issue {id} (backlog only) when it is not ready
 to build, and bring it back to the Backlog with revive_issue {id}.
@@ -117,6 +123,18 @@ const TOOLS = [
     description: 'List all projects registered in the issue tracker.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     handler: () => listProjects(DATA_DIR),
+  },
+  {
+    name: 'list_tags',
+    description:
+      "A project's tag vocabulary: every tag in use (across open, iceboxed, and closed issues) with its issue count and last-used timestamp, most used first. Call this before tagging an issue and prefer an existing tag over inventing a near-duplicate. Tags are per project.",
+    inputSchema: {
+      type: 'object',
+      properties: { project: { type: 'string', description: 'Project key, e.g. "platform"' } },
+      required: ['project'],
+      additionalProperties: false,
+    },
+    handler: ({ project }) => listTags(DATA_DIR, project),
   },
   {
     name: 'list_issues',
@@ -166,7 +184,7 @@ const TOOLS = [
         title: { type: 'string' },
         type: { type: 'string', enum: TYPES, default: 'other' },
         severity: { type: 'integer', minimum: 1, maximum: 5, default: 3 },
-        tags: { type: 'array', items: { type: 'string' } },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Prefer existing tags (see list_tags) over new ones' },
         seeing: { type: 'string', description: 'What is wrong / current behavior' },
         expecting: { type: 'string', description: 'Desired behavior / requirements' },
         relatedTo: { type: 'string', description: 'Optional id of a related prior issue' },
@@ -188,7 +206,7 @@ const TOOLS = [
         title: { type: 'string' },
         type: { type: 'string', enum: TYPES },
         severity: { type: 'integer', minimum: 1, maximum: 5 },
-        tags: { type: 'array', items: { type: 'string' } },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Full replacement list; prefer existing tags (see list_tags)' },
         related_to: { type: 'string', description: 'Id of a related prior issue (regression chains)' },
       },
       required: ['id'],

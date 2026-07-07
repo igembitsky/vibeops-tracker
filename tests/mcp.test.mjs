@@ -61,6 +61,7 @@ test('mcp server speaks the protocol and round-trips issues', async (t) => {
     'icebox_issue',
     'list_issues',
     'list_projects',
+    'list_tags',
     'resolve_issue',
     'revive_issue',
     'search_issues',
@@ -93,6 +94,12 @@ test('mcp server speaks the protocol and round-trips issues', async (t) => {
   assert.equal(issues[0].title, 'Retitled by agent');
   assert.equal(issues[0].severity, 5);
 
+  const vocab = await mcp.request('tools/call', { name: 'list_tags', arguments: { project: 'test' } });
+  assert.ok(!vocab.result.isError, JSON.stringify(vocab.result));
+  const tags = JSON.parse(vocab.result.content[0].text);
+  assert.deepEqual(tags.map((t2) => [t2.name, t2.count]), [['mcp', 1]]);
+  assert.ok(tags[0].lastUsed, 'lastUsed is stamped');
+
   const commented = await mcp.request('tools/call', {
     name: 'add_comment',
     arguments: { id: 'test-1', author: 'claude', text: 'working on it' },
@@ -119,6 +126,7 @@ test('mcp server speaks the protocol and round-trips issues', async (t) => {
   assert.match(doctrine, /Issue references/i);
   assert.match(doctrine, /platform-48/);
   assert.match(doctrine, /in-progress/);
+  assert.match(doctrine, /list_tags/);
   assert.match(doctrine, /resolve_issue/);
   assert.match(doctrine, /never edit/i);
   assert.match(doctrine, /icebox/i);

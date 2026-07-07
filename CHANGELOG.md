@@ -8,6 +8,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Agents can see the tag vocabulary: a new `list_tags` MCP tool returns a
+  project's tags with issue counts and last-used timestamps, and the doctrine
+  now tells agents to reuse existing tags instead of minting near-duplicates
+  when filing or updating issues.
 - **Board card redesign.** Severity now shows as signal-strength bars pinned to a
   fixed spot (far right of every card), so it always reads from the same place
   instead of drifting with the tags. Each card shows one time, the last-activity
