@@ -59,12 +59,14 @@ test('mcp server speaks the protocol and round-trips issues', async (t) => {
     'get_issue',
     'get_tracker_instructions',
     'icebox_issue',
+    'link_issues',
     'list_issues',
     'list_projects',
     'list_tags',
     'resolve_issue',
     'revive_issue',
     'search_issues',
+    'unlink_issues',
     'update_issue',
   ]);
 
@@ -141,6 +143,11 @@ test('mcp server speaks the protocol and round-trips issues', async (t) => {
   assert.match(doctrine, /What happened: \.\.\. Impact: \.\.\./);
   assert.match(doctrine, /What\s+should happen: \.\.\. Payoff: \.\.\./);
   assert.doesNotMatch(doctrine, /capture-retro/);
+  // linking doctrine: the tools plus the two behavioral rules
+  assert.match(doctrine, /link_issues/);
+  assert.match(doctrine, /duplicate/i);
+  assert.match(doctrine, /clean the duplicate out|cleaned out/i);
+  assert.match(doctrine, /batch/i);
 
   const bad = await mcp.request('tools/call', { name: 'update_issue', arguments: { id: 'test-1', status: 'bogus' } });
   assert.equal(bad.result.isError, true);
@@ -169,6 +176,27 @@ test('mcp server speaks the protocol and round-trips issues', async (t) => {
     (await mcp.request('tools/call', { name: 'list_issues', arguments: { project: 'test', status: 'backlog' } })).result.content[0].text
   );
   assert.ok(backlogAfterRevive.some((i) => i.id === parkable.id), 'revived issue is back in list_issues');
+
+  // linking: two-sided duplicate link, enriched get_issue on both ends, then unlink
+  const linkA = JSON.parse(
+    (await mcp.request('tools/call', { name: 'create_issue', arguments: { project: 'test', title: 'link A dup', seeing: 's', expecting: 'e' } })).result.content[0].text
+  );
+  const linkB = JSON.parse(
+    (await mcp.request('tools/call', { name: 'create_issue', arguments: { project: 'test', title: 'link B canonical', seeing: 's', expecting: 'e' } })).result.content[0].text
+  );
+  const linkRes = await mcp.request('tools/call', {
+    name: 'link_issues',
+    arguments: { id: linkA.id, to: linkB.id, relationship: 'duplicate_of' },
+  });
+  assert.ok(!linkRes.result.isError, JSON.stringify(linkRes.result));
+  const aEnriched = JSON.parse((await mcp.request('tools/call', { name: 'get_issue', arguments: { id: linkA.id } })).result.content[0].text);
+  assert.deepEqual(aEnriched.links.map((l) => [l.rel, l.to, l.title]), [['duplicate_of', linkB.id, 'link B canonical']]);
+  const bEnriched = JSON.parse((await mcp.request('tools/call', { name: 'get_issue', arguments: { id: linkB.id } })).result.content[0].text);
+  assert.deepEqual(bEnriched.links.map((l) => [l.rel, l.to]), [['duplicated_by', linkA.id]]);
+  const unlinkRes = await mcp.request('tools/call', { name: 'unlink_issues', arguments: { id: linkA.id, to: linkB.id } });
+  assert.ok(!unlinkRes.result.isError, JSON.stringify(unlinkRes.result));
+  const aCleared = JSON.parse((await mcp.request('tools/call', { name: 'get_issue', arguments: { id: linkA.id } })).result.content[0].text);
+  assert.deepEqual(aCleared.links, []);
 
   // delete_issue: refuses without confirm, then permanently removes
   const noConfirm = await mcp.request('tools/call', { name: 'delete_issue', arguments: { id: 'test-1' } });

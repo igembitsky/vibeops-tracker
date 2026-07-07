@@ -146,6 +146,58 @@ test('GET /api/issues/:id/prompt returns text/plain prompt', async () => {
   assert.match(text, /curl -X PATCH/);
 });
 
+test('link/unlink endpoints write two-sided links; GET enriches; prompt carries doctrine', async () => {
+  const mk = (title) =>
+    fetch(`${base}/api/issues`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project: 'linkproj', title, seeing: 's', expecting: 'e' }),
+    }).then((r) => r.json());
+  const a = await mk('canonical'); // linkproj-1
+  const b = await mk('the duplicate'); // linkproj-2
+
+  // b is a duplicate of a
+  const linked = await fetch(`${base}/api/issues/${b.id}/links`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to: a.id, rel: 'duplicate_of' }),
+  });
+  assert.equal(linked.status, 200);
+  const bAfter = await json(linked);
+  // GET returns enriched links (title/status carried through)
+  assert.equal(bAfter.links.length, 1);
+  assert.equal(bAfter.links[0].rel, 'duplicate_of');
+  assert.equal(bAfter.links[0].to, a.id);
+  assert.equal(bAfter.links[0].title, 'canonical');
+
+  // the mirror lands on the canonical issue
+  const aGet = await json(await fetch(`${base}/api/issues/${a.id}`));
+  assert.deepEqual(aGet.links.map((l) => [l.rel, l.to]), [['duplicated_by', b.id]]);
+
+  // board list carries raw links so the card can show a count
+  const board = await (await fetch(`${base}/api/projects/linkproj/issues`)).json();
+  assert.equal(board.find((i) => i.id === a.id).links.length, 1);
+
+  // the copy-prompt for the canonical issue tells the agent to clean out the dup
+  const prompt = await (await fetch(`${base}/api/issues/${a.id}/prompt`)).text();
+  assert.match(prompt, /Linked issues/);
+  assert.match(prompt, /duplicates of this one/i);
+
+  // unlink clears both ends
+  const unlinked = await fetch(`${base}/api/issues/${b.id}/links/${a.id}`, { method: 'DELETE' });
+  assert.equal(unlinked.status, 200);
+  assert.deepEqual((await json(unlinked)).links, []);
+  assert.deepEqual((await json(await fetch(`${base}/api/issues/${a.id}`))).links, []);
+
+  // linking is same-origin guarded (PATCH)
+  const evil = await fetch(`${base}/api/issues/${b.id}/links`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Origin: 'http://evil.example' },
+    body: JSON.stringify({ to: a.id, rel: 'related' }),
+  });
+  assert.equal(evil.status, 403);
+});
+
 test('POST /api/projects registers a named project', async () => {
   const res = await fetch(`${base}/api/projects`, {
     method: 'POST',

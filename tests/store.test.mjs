@@ -23,6 +23,9 @@ import {
   listTags,
   renameTag,
   deleteTag,
+  linkIssues,
+  unlinkIssues,
+  resolveLinks,
 } from '../lib/store.mjs';
 
 function tmpDataDir() {
@@ -99,14 +102,13 @@ test('issue round-trips body sections, context, and tricky content', () => {
     seeing: 'Code fence inside: ```js\nfoo()\n``` and --- dashes',
     expecting: 'Multi\n\nparagraph expectation',
     context,
-    relatedTo: 'platform-0',
   });
   const got = getIssue(dir, made.id);
   assert.equal(got.title, 'Weird chars & "quotes"');
   assert.equal(got.type, 'bug');
   assert.equal(got.severity, 5);
   assert.deepEqual(got.tags, ['auth', 'ui']);
-  assert.equal(got.relatedTo, 'platform-0');
+  assert.deepEqual(got.links, []);
   assert.equal(got.seeing, 'Code fence inside: ```js\nfoo()\n``` and --- dashes');
   assert.equal(got.expecting, 'Multi\n\nparagraph expectation');
   assert.deepEqual(got.context, context);
@@ -293,12 +295,92 @@ test('ensureProject upserts name and repo_path', () => {
   assert.deepEqual(listProjects(dir), [updated]);
 });
 
-test('relatedTo is patchable via updateIssue', () => {
+test('linkIssues writes a two-sided related link', () => {
   const dir = tmpDataDir();
   const a = createIssue(dir, { project: 'p', seeing: 's', expecting: 'e' });
   const b = createIssue(dir, { project: 'p', seeing: 's2', expecting: 'e2' });
-  updateIssue(dir, b.id, { relatedTo: a.id });
-  assert.equal(getIssue(dir, b.id).relatedTo, a.id);
+  linkIssues(dir, a.id, b.id, 'related');
+  assert.deepEqual(getIssue(dir, a.id).links, [{ rel: 'related', to: b.id }]);
+  assert.deepEqual(getIssue(dir, b.id).links, [{ rel: 'related', to: a.id }]);
+});
+
+test('linkIssues mirrors duplicate_of to duplicated_by on the canonical issue', () => {
+  const dir = tmpDataDir();
+  const dup = createIssue(dir, { project: 'p', seeing: 's', expecting: 'e' });
+  const canon = createIssue(dir, { project: 'p', seeing: 's2', expecting: 'e2' });
+  linkIssues(dir, dup.id, canon.id, 'duplicate_of');
+  assert.deepEqual(getIssue(dir, dup.id).links, [{ rel: 'duplicate_of', to: canon.id }]);
+  assert.deepEqual(getIssue(dir, canon.id).links, [{ rel: 'duplicated_by', to: dup.id }]);
+});
+
+test('relinking a pair replaces the prior relationship, not duplicates it', () => {
+  const dir = tmpDataDir();
+  const a = createIssue(dir, { project: 'p', seeing: 's', expecting: 'e' });
+  const b = createIssue(dir, { project: 'p', seeing: 's2', expecting: 'e2' });
+  linkIssues(dir, a.id, b.id, 'related');
+  linkIssues(dir, a.id, b.id, 'duplicate_of');
+  assert.deepEqual(getIssue(dir, a.id).links, [{ rel: 'duplicate_of', to: b.id }]);
+  assert.deepEqual(getIssue(dir, b.id).links, [{ rel: 'duplicated_by', to: a.id }]);
+});
+
+test('unlinkIssues removes the link from both files and is idempotent', () => {
+  const dir = tmpDataDir();
+  const a = createIssue(dir, { project: 'p', seeing: 's', expecting: 'e' });
+  const b = createIssue(dir, { project: 'p', seeing: 's2', expecting: 'e2' });
+  linkIssues(dir, a.id, b.id, 'related');
+  unlinkIssues(dir, a.id, b.id);
+  assert.deepEqual(getIssue(dir, a.id).links, []);
+  assert.deepEqual(getIssue(dir, b.id).links, []);
+  unlinkIssues(dir, a.id, b.id); // no throw, still empty
+  assert.deepEqual(getIssue(dir, a.id).links, []);
+});
+
+test('linkIssues rejects self-links and unknown relationships', () => {
+  const dir = tmpDataDir();
+  const a = createIssue(dir, { project: 'p', seeing: 's', expecting: 'e' });
+  assert.throws(() => linkIssues(dir, a.id, a.id, 'related'), /itself/);
+  const b = createIssue(dir, { project: 'p', seeing: 's', expecting: 'e' });
+  assert.throws(() => linkIssues(dir, a.id, b.id, 'blocks'), /Invalid relationship/);
+});
+
+test('linkIssues does not bump updated/lastActivity (metadata gardening)', () => {
+  const dir = tmpDataDir();
+  const a = createIssue(dir, { project: 'p', seeing: 's', expecting: 'e' });
+  const b = createIssue(dir, { project: 'p', seeing: 's2', expecting: 'e2' });
+  const before = getIssue(dir, a.id).lastActivity;
+  linkIssues(dir, a.id, b.id, 'related');
+  assert.equal(getIssue(dir, a.id).lastActivity, before);
+});
+
+test('createIssue relatedTo becomes a two-sided related link', () => {
+  const dir = tmpDataDir();
+  const a = createIssue(dir, { project: 'p', seeing: 's', expecting: 'e' });
+  const b = createIssue(dir, { project: 'p', seeing: 's2', expecting: 'e2', relatedTo: a.id });
+  assert.deepEqual(getIssue(dir, b.id).links, [{ rel: 'related', to: a.id }]);
+  assert.deepEqual(getIssue(dir, a.id).links, [{ rel: 'related', to: b.id }]);
+});
+
+test('legacy related_to frontmatter reads as one related link', () => {
+  const dir = tmpDataDir();
+  const a = createIssue(dir, { project: 'p', seeing: 's', expecting: 'e' });
+  const b = createIssue(dir, { project: 'p', seeing: 's2', expecting: 'e2' });
+  // hand-write a legacy file (single scalar related_to, no links array)
+  const legacy = `---\nid: ${b.id}\nproject: p\ntitle: legacy\nstatus: backlog\ntype: other\ntags: []\nseverity: 3\nordinal: 2000\nrelated_to: ${a.id}\n---\n\n<!-- SECTION:SEEING:BEGIN -->\n## Seeing\n\ns\n<!-- SECTION:SEEING:END -->\n`;
+  fs.writeFileSync(b.file, legacy);
+  assert.deepEqual(getIssue(dir, b.id).links, [{ rel: 'related', to: a.id }]);
+});
+
+test('resolveLinks enriches targets with title, type, and status', () => {
+  const dir = tmpDataDir();
+  const a = createIssue(dir, { project: 'p', title: 'Alpha', type: 'bug', seeing: 's', expecting: 'e' });
+  const b = createIssue(dir, { project: 'p', title: 'Beta', seeing: 's2', expecting: 'e2' });
+  linkIssues(dir, b.id, a.id, 'duplicate_of');
+  const [resolved] = resolveLinks(dir, getIssue(dir, b.id).links);
+  assert.equal(resolved.rel, 'duplicate_of');
+  assert.equal(resolved.to, a.id);
+  assert.equal(resolved.title, 'Alpha');
+  assert.equal(resolved.type, 'bug');
+  assert.equal(resolved.status, 'backlog');
 });
 
 test('resolveIssue writes resolution, modified files, and moves to in-review', () => {

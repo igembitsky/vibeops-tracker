@@ -9,6 +9,7 @@ import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprot
 import {
   STATUSES,
   TYPES,
+  LINK_RELS,
   listProjects,
   createIssue,
   getIssue,
@@ -21,6 +22,9 @@ import {
   iceboxIssue,
   reviveIssue,
   listTags,
+  linkIssues,
+  unlinkIssues,
+  resolveLinks,
 } from './lib/store.mjs';
 import { resolveDataDir } from './lib/data-dir.mjs';
 
@@ -48,7 +52,8 @@ human asked or the issue is unambiguous junk. For real issues, prefer resolve_is
 add_comment. Never move an issue to done yourself, since a human verifies in-review work.
 
 Workflow:
-1. search_issues first when filing, so you avoid duplicates; link regressions with related_to.
+1. search_issues first when filing. If you find a near-match, do not file a second copy: link it
+   instead (link_issues) as related, or, when it is genuinely the same ask, mark the duplicate.
 2. To pick up work: list_issues {project, status: "on-deck"}. On Deck is the human-curated,
    prioritized queue of work ready for agents; the FIRST result is the highest priority. Do NOT
    pull from Backlog (that is the human's triage pool), and never move issues into on-deck
@@ -82,6 +87,23 @@ Workflow:
    It lands in Backlog; never promote it yourself. The human periodically runs a
    meta-retrospective over the agent-retro queue to act on it or clear it.
 7. File new issues you notice with create_issue (seeing/expecting required).
+
+Linking issues (link_issues / unlink_issues): a link is typed and two-sided, written to both
+issues at once. Relationships:
+- related: the two issues share a surface and would sensibly be worked together.
+- duplicate_of / duplicated_by: link_issues {id, to, relationship: "duplicate_of"} marks THIS issue
+  (id) as a duplicate of the canonical survivor (to); the survivor automatically shows duplicated_by.
+Two rules follow from links, and they matter:
+- DUPLICATES get cleaned out. Never do the same work twice. When an issue is a duplicate of another,
+  do the work on the canonical (survivor) issue and clean the duplicate out: resolve it with a short
+  "Duplicate of <id>" note (or delete_issue it if it is pure noise). When you finish a canonical
+  issue, also clean out anything marked as its duplicate (duplicated_by) so it does not linger. Before
+  cleaning out a duplicate, carry any unique detail it holds over to the survivor (a comment is fine).
+- RELATED work gets batched. When you pick up an issue that has related links, focus on what was
+  actually asked, but check the related issues: if any can be handled in the same change, do them
+  together and resolve them together, so related work lands and moves through the board as one batch.
+  Call out the ones you folded in when you resolve. Do not silently expand scope beyond what shares
+  the change.
 
 Statuses: ${STATUSES.join(' | ')}. Severity 1 (cosmetic) to 5 (blocker).
 Tags are per project and free-form, and the vocabulary only stays useful if it stays
@@ -176,7 +198,9 @@ const TOOLS = [
         err.code = 'NOT_FOUND';
         throw err;
       }
-      return issue;
+      // Enrich links with each target's title/status/type so the relationship
+      // (and whether the other side is still open) reads without extra lookups.
+      return { ...issue, links: resolveLinks(DATA_DIR, issue.links) };
     },
   },
   {
@@ -202,7 +226,7 @@ const TOOLS = [
   {
     name: 'update_issue',
     description:
-      'Patch issue fields: status (set in-progress when you start working), title, type, severity, tags, related_to. Only the provided fields change. Board position (ordinal) is human-controlled and not patchable here.',
+      'Patch issue fields: status (set in-progress when you start working), title, type, severity, tags. Only the provided fields change. Board position (ordinal) is human-controlled and not patchable here. To connect issues, use link_issues (not this tool).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -212,17 +236,45 @@ const TOOLS = [
         type: { type: 'string', enum: TYPES },
         severity: { type: 'integer', minimum: 1, maximum: 5 },
         tags: { type: 'array', items: { type: 'string' }, description: 'Full replacement list; prefer existing tags (see list_tags)' },
-        related_to: { type: 'string', description: 'Id of a related prior issue (regression chains)' },
       },
       required: ['id'],
       additionalProperties: false,
     },
-    handler: ({ id, related_to, ...rest }) => {
+    handler: ({ id, ...rest }) => {
       const patch = { ...rest };
-      if (related_to !== undefined) patch.relatedTo = related_to;
       if (!Object.keys(patch).length) throw new Error('provide at least one field to update');
       return updateIssue(DATA_DIR, id, patch);
     },
+  },
+  {
+    name: 'link_issues',
+    description:
+      'Connect two issues with a typed, two-sided link (written to both). relationship: "related" (they share a surface, worth tackling together), or "duplicate_of" (id is a duplicate of the canonical survivor `to`; the survivor shows "duplicated_by"). Duplicates should be cleaned out: do the work on the survivor and resolve/delete the duplicate. Relating a near-match beats filing a second copy.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'The issue you are linking from, e.g. "platform-3"' },
+        to: { type: 'string', description: 'The other issue id' },
+        relationship: { type: 'string', enum: LINK_RELS, default: 'related', description: 'related | duplicate_of | duplicated_by' },
+      },
+      required: ['id', 'to'],
+      additionalProperties: false,
+    },
+    handler: ({ id, to, relationship }) => linkIssues(DATA_DIR, id, to, relationship || 'related'),
+  },
+  {
+    name: 'unlink_issues',
+    description: 'Remove the link between two issues (clears it from both files). Idempotent.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'One issue id' },
+        to: { type: 'string', description: 'The other issue id' },
+      },
+      required: ['id', 'to'],
+      additionalProperties: false,
+    },
+    handler: ({ id, to }) => unlinkIssues(DATA_DIR, id, to),
   },
   {
     name: 'resolve_issue',
