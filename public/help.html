@@ -59,9 +59,12 @@
     <p>1. Add one script tag to the project's frontend HTML (any framework, or none):</p>
     <pre><code>&lt;script src="http://localhost:4400/widget.js" data-project="my-project" defer&gt;&lt;/script&gt;</code></pre>
     <p>That's the whole install. A floating 🐞 button appears; submitting the dialog posts the issue
-    here with an automatic context snapshot: what you're looking at (URL, viewport, highlighted text)
-    is always attached. The activity trail (last 10 clicks, last 10 fetches, recent JS errors
-    and failed requests) is a dialog checkbox, on by default for bugs and off for other types.
+    here with an automatic context snapshot: what you're looking at (URL, viewport, color scheme,
+    highlighted text) is always attached, and the dialog's "Point at the element" mode records a
+    selector path to the exact element the report is about. The activity trail (last 10 clicks with
+    the page each happened on, last 10 fetches with identical polls collapsed, recent JS errors
+    and failed requests with a response-body snippet) is a dialog checkbox, on by default for bugs
+    and off for other types.
     The project key auto-registers on first capture. If the button ever covers something, drag it
     up or down: it stays pinned to the right edge and remembers where you put it.</p>
 

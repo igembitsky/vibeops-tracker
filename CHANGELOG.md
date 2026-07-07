@@ -8,6 +8,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Point at the element.** The capture dialog gained a "Point at the element on
+  the page" mode: the dialog steps aside, you click the element the report is
+  about, and the issue carries a machine-usable pointer (selector path, tag,
+  text) the way highlighted text already does. Escape cancels, Remove detaches.
+  The pointer surfaces in the board drawer and in generated agent prompts, so
+  visual bugs land without the prose-to-DOM reconstruction.
+- **Sharper capture trails.** Click breadcrumbs now stamp the page they
+  happened on; consecutive identical successful fetches (polling heartbeats)
+  collapse into one counted row so they never crowd out real traffic; failed
+  fetches carry a clipped response-body snippet plus content type, which tells
+  the resolver whether the backend or something in between answered; and the
+  snapshot records the reporter's prefers-color-scheme for theming reports.
+
 - Agents can see the tag vocabulary: a new `list_tags` MCP tool returns a
   project's tags with issue counts and last-used timestamps, and the doctrine
   now tells agents to reuse existing tags instead of minting near-duplicates

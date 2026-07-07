@@ -79,7 +79,7 @@
     'click',
     safe(function (e) {
       var t = e.target;
-      if (!t || isWidgetNode(t)) return;
+      if (!t || isWidgetNode(t) || picker) return;
       var dataAttrs = {};
       if (t.attributes) {
         for (var i = 0; i < t.attributes.length; i++) {
@@ -89,6 +89,7 @@
       }
       push(state.clickBreadcrumbs, {
         ts: new Date().toISOString(),
+        page: location.pathname,
         tag: t.tagName,
         id: t.id || null,
         cls: t.className && t.className.slice ? t.className.slice(0, 80) : null,
@@ -120,8 +121,34 @@
                 status: res.status,
                 ms: Date.now() - started,
               };
+              if (res.status >= 400) {
+                // The body often says which layer answered (backend copy vs an
+                // empty proxy body), so a clipped snippet rides along.
+                try {
+                  entry.contentType = (res.headers && res.headers.get && res.headers.get('content-type')) || null;
+                  if (res.clone) {
+                    res.clone().text().then(
+                      safe(function (bodyText) {
+                        entry.bodySnippet = String(bodyText).slice(0, 200);
+                      }),
+                      function () {}
+                    );
+                  }
+                } catch (_) {}
+                push(state.fetchBreadcrumbs, entry);
+                push(state.recentFetchFailures, entry);
+                return;
+              }
+              // Consecutive identical successes (polling heartbeats) fold into
+              // one row with a count, so they never crowd out real traffic.
+              var last = state.fetchBreadcrumbs[state.fetchBreadcrumbs.length - 1];
+              if (last && !last.error && last.status < 400 && last.status === res.status && last.method === method && last.url === entry.url) {
+                last.count = (last.count || 1) + 1;
+                last.ts = entry.ts;
+                last.ms = entry.ms;
+                return;
+              }
               push(state.fetchBreadcrumbs, entry);
-              if (res.status >= 400) push(state.recentFetchFailures, entry);
             }),
             safe(function (err) {
               push(state.fetchBreadcrumbs, {
@@ -217,8 +244,13 @@
     '.it-selhead{display:flex;justify-content:space-between;align-items:center;}',
     '.it-selremove{background:none;border:none;color:#6b7280;font-size:12px;cursor:pointer;text-decoration:underline;padding:0;}',
     '.it-selremove:hover{color:#dc2626;}',
-    '.it-selection{background:#f3f4f6;border:1px solid #e5e7eb;border-left:3px solid #6366f1;border-radius:6px;',
+    '.it-selection,.it-pointed{background:#f3f4f6;border:1px solid #e5e7eb;border-left:3px solid #6366f1;border-radius:6px;',
     'padding:6px 8px;font-size:12.5px;color:#374151;max-height:76px;overflow-y:auto;white-space:pre-wrap;overflow-wrap:anywhere;}',
+    '.it-point{border:1px dashed #d1d5db;background:#fff;border-radius:8px;padding:7px 10px;font-size:13px;color:#374151;cursor:pointer;text-align:left;}',
+    '.it-point:hover{border-color:#6366f1;color:#111827;}',
+    '.it-pick-hl{position:fixed;pointer-events:none;z-index:2147483004;border:2px solid #6366f1;background:rgba(99,102,241,.14);border-radius:4px;}',
+    '.it-pick-hint{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:#1f2937;color:#fff;padding:8px 14px;',
+    'border-radius:999px;z-index:2147483005;font:13px/1.4 -apple-system,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.3);}',
     '.it-check{display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;cursor:pointer;}',
     '.it-check input{accent-color:#6366f1;margin:0;}',
     '.it-error{color:#dc2626;font-size:13px;min-height:16px;}',
@@ -247,13 +279,19 @@
 
   function snapshot(opts) {
     opts = opts || {};
+    var colorScheme = null;
+    try {
+      if (window.matchMedia) colorScheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    } catch (_) {}
     var ctx = {
       capturedAt: new Date().toISOString(),
       url: location.href,
       viewport: { w: window.innerWidth, h: window.innerHeight },
+      colorScheme: colorScheme,
       userAgent: navigator.userAgent,
       selectedText: opts.selection != null ? opts.selection : state.selectedText || '',
     };
+    if (opts.pointed) ctx.pointedElement = opts.pointed;
     // The activity trail is bug forensics; "what am I looking at" above is
     // always attached, the trail only when wanted (dialog checkbox).
     if (opts.trail !== false) {
@@ -270,6 +308,103 @@
       }
     }
     return ctx;
+  }
+
+  // ---- element picker -------------------------------------------------------
+  // Point-at-it capture: the reporter clicks the element the issue is about and
+  // the report carries a machine-usable pointer (selector path, tag, text), so
+  // agents skip the prose-to-DOM reconstruction on visual bugs.
+
+  var picker = null; // truthy while pick mode is active; gates the breadcrumb listener
+
+  function selectorPath(node) {
+    var parts = [];
+    while (node && node.nodeType === 1 && node !== document.body) {
+      if (node.id) {
+        parts.unshift('#' + node.id);
+        break;
+      }
+      var tag = node.tagName.toLowerCase();
+      var parent = node.parentElement;
+      var sameTag = 0;
+      if (parent) {
+        for (var i = 0; i < parent.children.length; i++) {
+          if (parent.children[i].tagName === node.tagName) sameTag++;
+        }
+      }
+      if (sameTag > 1) {
+        var idx = 1;
+        var sib = node;
+        while ((sib = sib.previousElementSibling)) if (sib.tagName === node.tagName) idx++;
+        tag += ':nth-of-type(' + idx + ')';
+      }
+      parts.unshift(tag);
+      node = parent;
+    }
+    return parts.join(' > ');
+  }
+
+  function startPicking(onDone) {
+    if (picker) return;
+    var hl = el('div', 'it-pick-hl');
+    hl.setAttribute('data-issue-tracker-ui', '1');
+    hl.style.display = 'none';
+    var hint = el('div', 'it-pick-hint', 'Click the element this issue is about (Esc to cancel)');
+    hint.setAttribute('data-issue-tracker-ui', '1');
+    document.body.appendChild(hl);
+    document.body.appendChild(hint);
+
+    function targetAt(e) {
+      var t = e.target;
+      return t && t.nodeType === 1 && !isWidgetNode(t) ? t : null;
+    }
+    var onMove = safe(function (e) {
+      var t = targetAt(e);
+      if (!t) {
+        hl.style.display = 'none';
+        return;
+      }
+      var r = t.getBoundingClientRect();
+      hl.style.display = 'block';
+      hl.style.left = r.left - 2 + 'px';
+      hl.style.top = r.top - 2 + 'px';
+      hl.style.width = r.width + 'px';
+      hl.style.height = r.height + 'px';
+    });
+    var onClick = safe(function (e) {
+      var t = targetAt(e);
+      if (!t) return; // clicks on widget UI neither pick nor cancel
+      e.preventDefault();
+      e.stopPropagation();
+      finish(t);
+    });
+    var onKey = safe(function (e) {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation(); // the hidden dialog's Escape handler must not fire
+      finish(null);
+    });
+    function finish(target) {
+      document.removeEventListener('mousemove', onMove, true);
+      document.removeEventListener('click', onClick, true);
+      document.removeEventListener('keydown', onKey, true);
+      hl.remove();
+      hint.remove();
+      picker = null;
+      onDone(
+        target
+          ? {
+              selector: selectorPath(target),
+              tag: target.tagName,
+              id: target.id || null,
+              text: (target.textContent || '').trim().slice(0, 80),
+            }
+          : null
+      );
+    }
+    picker = true;
+    document.addEventListener('mousemove', onMove, true);
+    document.addEventListener('click', onClick, true);
+    document.addEventListener('keydown', onKey, true);
   }
 
   // ---- dialog -------------------------------------------------------------
@@ -379,7 +514,7 @@
     // selection exists right now, prefer it over the last mousedown snapshot.
     var liveSel = window.getSelection ? String(window.getSelection()) : '';
     if (liveSel) state.selectedText = liveSel.slice(0, 500);
-    var captured = { selection: state.selectedText || '' };
+    var captured = { selection: state.selectedText || '', pointed: null };
     var trail = null;
     var trailTouched = false;
 
@@ -393,7 +528,8 @@
         (title && title.value.trim()) ||
         (seeing && seeing.value.trim()) ||
         (expecting && expecting.value.trim()) ||
-        (tags && tags.isDirty())
+        (tags && tags.isDirty()) ||
+        captured.pointed
       );
     }
     function nudge() {
@@ -534,6 +670,53 @@
       );
       body.appendChild(selRow);
     }
+
+    // Point-at-it: attach a machine-usable pointer to the element the issue
+    // is about, the way a text selection already rides along.
+    var pointRow = el('div', 'it-row');
+    var pointHead = el('div', 'it-selhead');
+    pointHead.appendChild(el('span', 'it-label', 'Element (optional)'));
+    var pointRemove = el('button', 'it-selremove', 'Remove');
+    pointRemove.setAttribute('type', 'button');
+    pointHead.appendChild(pointRemove);
+    pointRow.appendChild(pointHead);
+    var pointBtn = el('button', 'it-point', '⌖ Point at the element on the page');
+    pointBtn.setAttribute('type', 'button');
+    var pointBox = el('div', 'it-pointed');
+    pointRow.appendChild(pointBtn);
+    pointRow.appendChild(pointBox);
+    function renderPointed() {
+      var p = captured.pointed;
+      pointRemove.style.display = p ? '' : 'none';
+      pointBox.style.display = p ? '' : 'none';
+      pointBtn.style.display = p ? 'none' : '';
+      pointBox.textContent = p ? p.selector + (p.text ? ' — “' + p.text + '”' : '') : '';
+    }
+    pointRemove.addEventListener(
+      'click',
+      safe(function () {
+        captured.pointed = null;
+        renderPointed();
+      })
+    );
+    pointBtn.addEventListener(
+      'click',
+      safe(function () {
+        // The page must be clickable while picking, so the dialog steps aside.
+        if (ui.dialog) ui.dialog.style.display = 'none';
+        if (ui.backdrop) ui.backdrop.style.display = 'none';
+        startPicking(
+          safe(function (p) {
+            if (ui.dialog) ui.dialog.style.display = '';
+            if (ui.backdrop) ui.backdrop.style.display = '';
+            if (p) captured.pointed = p;
+            renderPointed();
+          })
+        );
+      })
+    );
+    renderPointed();
+    body.appendChild(pointRow);
 
     var trailRow = el('label', 'it-check');
     trail = document.createElement('input');
@@ -918,7 +1101,11 @@
       tags: f.tags.getTags(),
       seeing: seeing,
       expecting: expecting,
-      context: snapshot({ trail: f.trail ? f.trail.checked : true, selection: f.captured ? f.captured.selection : null }),
+      context: snapshot({
+        trail: f.trail ? f.trail.checked : true,
+        selection: f.captured ? f.captured.selection : null,
+        pointed: f.captured ? f.captured.pointed : null,
+      }),
     };
 
     window

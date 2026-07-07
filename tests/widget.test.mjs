@@ -399,6 +399,128 @@ test('repeated dialog open/close does not accumulate document keydown/drag liste
   assert.equal(document.querySelector('.it-dialog'), null);
 });
 
+test('click breadcrumbs carry the page they happened on', async () => {
+  const { document, calls } = loadWidget();
+  document.querySelector('#host-btn').click();
+  openDialog(document);
+  fillAndSubmit(document);
+  await tick();
+  const payload = JSON.parse(calls.find((c) => c.url.endsWith('/api/issues')).opts.body);
+  assert.equal(payload.context.clickBreadcrumbs.at(-1).page, '/page');
+});
+
+test('consecutive identical successful fetches collapse into one counted entry', async () => {
+  const { window, document, calls } = loadWidget();
+  for (let i = 0; i < 4; i++) await window.fetch('http://localhost:4556/api/poll');
+  await window.fetch('http://localhost:4556/api/other');
+  await window.fetch('http://localhost:4556/api/poll');
+  openDialog(document);
+  fillAndSubmit(document);
+  await tick();
+  const trail = JSON.parse(calls.find((c) => c.url.endsWith('/api/issues')).opts.body).context.fetchBreadcrumbs;
+  const polls = trail.filter((f) => f.url.includes('/api/poll'));
+  assert.equal(polls.length, 2, 'the poll run collapses; the one after /api/other starts a new entry');
+  assert.equal(polls[0].count, 4, 'the collapsed entry counts its repeats');
+  assert.equal(polls[1].count, undefined, 'a single occurrence carries no count');
+});
+
+test('failed fetches keep individual entries with a clipped body snippet and content type', async () => {
+  const calls = [];
+  const failure = () =>
+    Promise.resolve({
+      ok: false,
+      status: 500,
+      headers: { get: (h) => (h === 'content-type' ? 'text/html' : null) },
+      clone: () => ({ text: async () => '<html>Gateway timeout and a very long proxy page body ' + 'x'.repeat(300) }),
+      json: async () => ({}),
+    });
+  const { window, document } = loadWidget({
+    fetchImpl: (url, opts = {}) => {
+      calls.push({ url: String(url), opts });
+      if (String(url).includes('/api/broken')) return failure();
+      return Promise.resolve({ ok: true, status: 201, json: async () => ({ id: 'platform-1' }) });
+    },
+  });
+  await window.fetch('http://localhost:4556/api/broken');
+  await window.fetch('http://localhost:4556/api/broken');
+  await tick();
+  openDialog(document);
+  fillAndSubmit(document);
+  await tick();
+  const ctx = JSON.parse(calls.find((c) => c.url.endsWith('/api/issues')).opts.body).context;
+  assert.equal(ctx.recentFetchFailures.length, 2, 'failures never collapse');
+  const fail = ctx.recentFetchFailures[0];
+  assert.equal(fail.contentType, 'text/html');
+  assert.equal(fail.bodySnippet.length, 200, 'body clipped to 200 chars');
+  assert.match(fail.bodySnippet, /Gateway timeout/);
+});
+
+test('the snapshot records the reporter color scheme', async () => {
+  const { document, calls } = loadWidget({
+    beforeEval: (win) => {
+      win.matchMedia = (q) => ({ matches: q.includes('dark') });
+    },
+  });
+  openDialog(document);
+  fillAndSubmit(document);
+  await tick();
+  const ctx = JSON.parse(calls.find((c) => c.url.endsWith('/api/issues')).opts.body).context;
+  assert.equal(ctx.colorScheme, 'dark', 'colorScheme captured from prefers-color-scheme');
+});
+
+// ---- element picker ---------------------------------------------------------
+
+test('point-at-it records the clicked element and attaches it to the payload', async () => {
+  const { window, document, calls } = loadWidget();
+  openDialog(document);
+  document.querySelector('.it-point').click();
+  assert.equal(document.querySelector('.it-dialog').style.display, 'none', 'dialog steps aside while picking');
+  assert.ok(document.querySelector('.it-pick-hint'), 'pick-mode hint shown');
+
+  document.querySelector('#host-btn').dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
+  assert.equal(document.querySelector('.it-dialog').style.display, '', 'dialog returns after picking');
+  assert.equal(document.querySelector('.it-pick-hint'), null, 'pick mode ended');
+  assert.match(document.querySelector('.it-pointed').textContent, /#host-btn/, 'picked element previewed');
+
+  fillAndSubmit(document);
+  await tick();
+  const ctx = JSON.parse(calls.find((c) => c.url.endsWith('/api/issues')).opts.body).context;
+  assert.equal(ctx.pointedElement.selector, '#host-btn');
+  assert.equal(ctx.pointedElement.tag, 'BUTTON');
+  assert.equal(ctx.pointedElement.text, 'Save');
+  assert.ok(!ctx.clickBreadcrumbs.some((b) => b.id === 'host-btn'), 'the picking click is not a breadcrumb');
+});
+
+test('Escape cancels picking and brings the dialog back without a pointer', async () => {
+  const { window, document, calls } = loadWidget();
+  openDialog(document);
+  document.querySelector('.it-point').click();
+  document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  assert.ok(document.querySelector('.it-dialog'), 'dialog still exists');
+  assert.equal(document.querySelector('.it-dialog').style.display, '', 'dialog visible again');
+  assert.equal(document.querySelector('.it-pick-hint'), null, 'pick mode ended');
+  fillAndSubmit(document);
+  await tick();
+  const ctx = JSON.parse(calls.find((c) => c.url.endsWith('/api/issues')).opts.body).context;
+  assert.ok(!('pointedElement' in ctx), 'no pointer attached after cancel');
+});
+
+test('Remove detaches a picked element from the report', async () => {
+  const { window, document, calls } = loadWidget();
+  openDialog(document);
+  document.querySelector('.it-point').click();
+  document.querySelector('#host-btn').dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
+  document.querySelector('.it-pointed').previousElementSibling; // pointed box rendered
+  document.querySelectorAll('.it-selremove').forEach((b) => {
+    if (b.style.display !== 'none') b.click();
+  });
+  assert.equal(document.querySelector('.it-pointed').style.display, 'none', 'preview removed');
+  fillAndSubmit(document);
+  await tick();
+  const ctx = JSON.parse(calls.find((c) => c.url.endsWith('/api/issues')).opts.body).context;
+  assert.ok(!('pointedElement' in ctx), 'no pointer in payload after Remove');
+});
+
 // ---- tag suggestions --------------------------------------------------------
 
 const VOCAB = [

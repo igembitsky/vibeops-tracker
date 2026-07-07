@@ -56,9 +56,14 @@ it. So there are three on-ramps, and you can mix them freely:
 
 A floating 🐞 button appears. Highlight the thing you're talking about, click
 the button, and the issue is captured with the selected text plus a context
-snapshot: the URL, the viewport, and (for bugs) an activity trail of your last
-clicks, network calls, and JavaScript errors. The widget never breaks the host
-app: if the tracker is down, it fails quietly and keeps your typed text.
+snapshot: the URL, the viewport, the color scheme, and (for bugs) an activity
+trail of your last clicks (with the page each happened on), network calls
+(consecutive identical polls collapse into one counted row; failures keep a
+clipped response-body snippet), and JavaScript errors. For visual issues, the
+dialog's "Point at the element" mode lets you click the exact element the
+report is about; its selector path rides along so agents skip the
+prose-to-DOM guessing. The widget never breaks the host app: if the tracker
+is down, it fails quietly and keeps your typed text.
 
 Optionally, tell the widget about app state the URL doesn't carry (active tab,
 selected record id, git branch) with

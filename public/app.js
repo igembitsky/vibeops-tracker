@@ -721,6 +721,7 @@
       if (c.viewport?.w) list.appendChild(el('li', null, `Viewport: ${c.viewport.w}×${c.viewport.h}`));
       if (c.capturedAt) list.appendChild(el('li', null, `Captured: ${c.capturedAt}`));
       if (c.selectedText) list.appendChild(el('li', null, `Selected text: "${c.selectedText}"`));
+      if (c.pointedElement?.selector) list.appendChild(el('li', null, `Pointed element: ${c.pointedElement.selector}`));
       if (c.recentErrors?.length) list.appendChild(el('li', null, `JS errors: ${c.recentErrors.length} (latest: ${c.recentErrors.at(-1).message})`));
       if (c.recentFetchFailures?.length) list.appendChild(el('li', null, `Failed requests: ${c.recentFetchFailures.length}`));
       if (c.clickBreadcrumbs?.length) list.appendChild(el('li', null, `Click breadcrumbs: ${c.clickBreadcrumbs.length}`));
