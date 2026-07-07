@@ -69,10 +69,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   capturing (app state the URL doesn't carry, identity/tenant, data counts,
   build provenance) and anti-noise rules (small JSON, pointers not dumps, never
   secrets or PII). Mirrored in the widget header, README, and Help page.
-- **Capture retrospective.** After resolving an issue, agents now evaluate which
-  captured context they used, what they had to reconstruct by hand, and what was
-  noise, and recommend any concrete integration tweak to the human in their
-  final report (never auto-filed as an issue).
+- **Agent retro.** After resolving an issue, an agent files a retro note only
+  when the work exposed a concrete improvement that would make future issues
+  cheaper to capture, diagnose, or fix; otherwise it skips the ceremony. All
+  retro notes land in one place: the tracker's own "vibeops" project, tagged
+  `agent-retro`, one issue per improvement (host-app integration ideas
+  included, prefixed with the host project key). Each note states its impact
+  (time or tokens lost, wrong diagnosis, per-capture noise) and derives its
+  severity from it, so a periodic human-run meta-retrospective can triage the
+  queue in one pass.
 
 ### Changed
 

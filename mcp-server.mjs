@@ -61,21 +61,26 @@ Workflow:
 5. Finish with resolve_issue {id, resolution, modified_files}, a PR-style summary of
    what changed, why, and how it was tested. This sets status to in-review; a HUMAN
    moves it to done after verifying. Never set done yourself.
-6. After resolving, run a brief capture retrospective and put it on the record:
-   (a) add_comment on the resolved issue (author: "claude"), plain product language,
-   exactly three parts: "What the capture solved" (the fields you actually used and what
-   each unlocked), "What we had to rebuild by hand" (what the widget could have captured
-   but did not), and "What was noise". End it with the ids of anything filed under (b).
-   (b) If the retro implies an improvement to the tracker itself (the widget, the capture
-   shape, these tools), file it with create_issue into the "vibeops" project: one issue
-   per improvement, type "improvement", tag "capture-retro" (always exactly that tag), a
-   title that states the problem in plain words. Write seeing as "What happened: ...
-   Consequence: ..." and expecting as "What should happen: ... Payoff: ...". It lands in
-   Backlog, the human triage pool; never promote it yourself.
-   An improvement to the HOST project's own widget integration (usually a configure()
-   context field; see below) is different: recommend it to the human in your final
-   report, never file it; the human files it if they adopt it. Nothing learned, no
-   comment, no mention.
+6. Agent retro, only when it earns its keep. After resolving, ask one question: did
+   working this issue expose a concrete improvement that would make future issues
+   cheaper to capture, diagnose, or fix? If not, skip the retro entirely: no comment,
+   no issue, no ceremony.
+   When there is one, file it with create_issue into the "vibeops" project (the
+   tracker's own meta project; auto-registers on first use): one issue per
+   improvement, type "improvement", tag "agent-retro" (always exactly that tag), a
+   title that states the problem in plain words. This is the single home for ALL
+   agent retro notes, both improvements to the tracker itself (widget, capture shape,
+   these tools) and to a host app's widget integration (usually a configure() context
+   field; see below); for host-side ones, prefix the title with the host project key
+   ("platform: expose active search state via configure()").
+   Every agent-retro issue states its impact, and severity follows from it. Write
+   seeing as "What happened: ... Impact: ..." where Impact names the concrete cost:
+   time or tokens spent rebuilding what a capture could have carried, a wrong or
+   slower diagnosis, or noise arriving on every capture. Write expecting as "What
+   should happen: ... Payoff: ...". Severity: 2 nice-to-have, 3 costs real time or
+   tokens on some issues, 4 hurts every issue or blocks diagnosis.
+   It lands in Backlog; never promote it yourself. The human periodically runs a
+   meta-retrospective over the agent-retro queue to act on it or clear it.
 7. File new issues you notice with create_issue (seeing/expecting required).
 
 Statuses: ${STATUSES.join(' | ')}. Severity 1 (cosmetic) to 5 (blocker).

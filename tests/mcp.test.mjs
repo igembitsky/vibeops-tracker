@@ -135,11 +135,12 @@ test('mcp server speaks the protocol and round-trips issues', async (t) => {
   assert.match(doctrine, /data-project/);
   assert.match(doctrine, /IssueTracker\?\.configure/);
   assert.match(doctrine, /never secrets or PII/i);
-  assert.match(doctrine, /capture retrospective/i);
-  assert.match(doctrine, /capture-retro/);
-  assert.match(doctrine, /What the capture solved/);
-  assert.match(doctrine, /What should happen: \.\.\. Payoff: \.\.\./);
-  assert.match(doctrine, /recommend it to the human in your final\s+report, never file it/);
+  assert.match(doctrine, /Agent retro/i);
+  assert.match(doctrine, /agent-retro/);
+  assert.match(doctrine, /skip the retro entirely/);
+  assert.match(doctrine, /What happened: \.\.\. Impact: \.\.\./);
+  assert.match(doctrine, /What\s+should happen: \.\.\. Payoff: \.\.\./);
+  assert.doesNotMatch(doctrine, /capture-retro/);
 
   const bad = await mcp.request('tools/call', { name: 'update_issue', arguments: { id: 'test-1', status: 'bogus' } });
   assert.equal(bad.result.isError, true);
