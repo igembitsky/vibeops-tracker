@@ -8,6 +8,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Capture surface as a tag.** The widget now derives the surface an issue was
+  reported on — the first path segment of the page URL, with its leading slash
+  (`/matches`, `/search-setup`, …) — and pre-fills it as a removable tag chip, so
+  issues are searchable and filterable by where they came from. The app root
+  (`/`) has no segment and gets no tag; the seeded chip doesn't make an untouched
+  draft "sticky", so an empty form still dismisses on an outside click. Raw
+  routes, no name mapping, so it generalizes to any app with routes.
+
 - **Linked issues (related + duplicate).** Issues can now be connected with typed,
   two-sided links, written to both markdown files at once so each stays
   self-describing. `related` (symmetric) marks issues that share a surface and

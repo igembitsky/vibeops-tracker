@@ -310,6 +310,21 @@
     return ctx;
   }
 
+  // The capture surface, as a route tag: the first path segment with its leading
+  // slash (e.g. "/open", "/search-setup"), so the tag reads unmistakably as a
+  // route. The app root ("/") has no segment and yields no surface. Query string
+  // and deeper segments are dropped, keeping the tag coarse and stable. The full
+  // URL still lives in context.url, so nothing is lost.
+  function deriveSurface() {
+    var seg;
+    try {
+      seg = String(location.pathname || '').split('/').filter(Boolean)[0];
+    } catch (_) {
+      return null;
+    }
+    return seg ? '/' + seg : null;
+  }
+
   // ---- element picker -------------------------------------------------------
   // Point-at-it capture: the reporter clicks the element the issue is about and
   // the report carries a machine-usable pointer (selector path, tag, text), so
@@ -647,7 +662,9 @@
 
     var tagsRow = el('div', 'it-row');
     tagsRow.appendChild(el('span', 'it-label', 'Tags'));
-    var tags = tagField();
+    // Pre-fill the capture surface as a route tag (removable). It rides in as a
+    // suggested chip so issues are searchable by where they were reported.
+    var tags = tagField(deriveSurface());
     tagsRow.appendChild(tags.root);
     body.appendChild(tagsRow);
     tagOutsideClose = tags.outsideClose;
@@ -794,9 +811,11 @@
     })
   );
 
-  function tagField() {
+  function tagField(initial) {
     var vocab = []; // [{name, count, lastUsed}] from the tracker
-    var selected = [];
+    // Seed tags (e.g. the auto-derived surface route) start as committed chips.
+    var seed = initial ? [].concat(initial).filter(Boolean) : [];
+    var selected = seed.slice();
     var open = false;
     var active = -1;
 
@@ -1040,6 +1059,8 @@
       })
     );
 
+    if (seed.length) renderChips(); // show the seeded surface chip on open
+
     window
       .fetch(endpoint + '/api/projects/' + encodeURIComponent(project) + '/tags')
       .then(function (res) {
@@ -1060,7 +1081,15 @@
     return {
       root: root,
       isDirty: function () {
-        return !!(selected.length || input.value.trim());
+        if (input.value.trim()) return true;
+        // The auto-filled surface tag alone is not "user effort", so an untouched
+        // draft still dismisses on an outside click. Any change to the tag set
+        // (adding, or removing the seeded surface) makes the draft sticky.
+        if (selected.length !== seed.length) return true;
+        for (var i = 0; i < selected.length; i++) {
+          if (seed.indexOf(selected[i]) === -1) return true;
+        }
+        return false;
       },
       outsideClose: function (e) {
         if (open && !root.contains(e.target)) {

@@ -5,10 +5,10 @@ import { JSDOM } from 'jsdom';
 
 const WIDGET_SRC = fs.readFileSync(new URL('../public/widget.js', import.meta.url), 'utf8');
 
-function loadWidget({ project = 'platform', fetchImpl, beforeEval } = {}) {
+function loadWidget({ project = 'platform', fetchImpl, beforeEval, url = 'http://localhost:4556/page?tab=main' } = {}) {
   const dom = new JSDOM(
     '<!doctype html><html><body><h1>Host app</h1><button id="host-btn" data-x="1">Save</button></body></html>',
-    { url: 'http://localhost:4556/page?tab=main', runScripts: 'outside-only', pretendToBeVisual: true }
+    { url, runScripts: 'outside-only', pretendToBeVisual: true }
   );
   const { window } = dom;
   const calls = [];
@@ -131,7 +131,8 @@ test('filled submit POSTs the right payload with captured context', async () => 
   assert.equal(payload.title, 'My bug');
   assert.equal(payload.type, 'feature');
   assert.equal(payload.severity, 5);
-  assert.deepEqual(payload.tags, ['auth', 'ui']);
+  // '/page' is the capture surface, pre-filled from the route as a removable chip.
+  assert.deepEqual(payload.tags, ['/page', 'auth', 'ui']);
   assert.equal(payload.seeing, 'I see breakage');
   assert.equal(payload.expecting, 'It should work');
 
@@ -529,11 +530,12 @@ const VOCAB = [
   { name: 'mcp', count: 1, lastUsed: '2026-07-02T00:00:00Z' },
 ];
 
-function loadWidgetWithVocab(vocabResponse) {
+function loadWidgetWithVocab(vocabResponse, opts = {}) {
   const calls = [];
   const loaded = loadWidget({
-    fetchImpl: (url, opts = {}) => {
-      calls.push({ url: String(url), opts });
+    ...opts,
+    fetchImpl: (url, o = {}) => {
+      calls.push({ url: String(url), opts: o });
       if (String(url).includes('/api/projects/platform/tags')) return vocabResponse();
       return Promise.resolve({ ok: true, status: 201, json: async () => ({ id: 'platform-1' }) });
     },
@@ -559,7 +561,9 @@ test('tag field lists fetched vocabulary; clicking a suggestion commits a chip a
   assert.deepEqual(rows.map((r) => r.querySelector('.it-dd-count').textContent), ['4', '2', '1']);
 
   rows[0].click(); // pick "ux"
-  assert.match(document.querySelector('.it-chip').textContent, /^ux/);
+  const chipText = [...document.querySelectorAll('.it-chip')].map((c) => c.textContent);
+  assert.ok(chipText.some((t) => /^ux/.test(t)), 'ux committed as a chip');
+  assert.ok(chipText.some((t) => /^\/page/.test(t)), 'surface chip is pre-filled alongside it');
   assert.equal(document.querySelector('.it-dd.it-open'), null, 'list closes after picking');
 
   // chips + uncommitted typed text both reach the payload
@@ -569,7 +573,7 @@ test('tag field lists fetched vocabulary; clicking a suggestion commits a chip a
   document.querySelector('.it-submit').click();
   await tick();
   const post = calls.find((c) => c.url === 'http://localhost:4400/api/issues');
-  assert.deepEqual(JSON.parse(post.opts.body).tags, ['ux', 'infra']);
+  assert.deepEqual(JSON.parse(post.opts.body).tags, ['/page', 'ux', 'infra']);
 });
 
 test('typing an unknown tag shows an explicit new-tag row; a known one does not', async () => {
@@ -606,7 +610,7 @@ test('a failed vocabulary fetch never breaks the dialog; typed tags still submit
   document.querySelector('.it-submit').click();
   await tick();
   const post = calls.find((c) => c.url === 'http://localhost:4400/api/issues');
-  assert.deepEqual(JSON.parse(post.opts.body).tags, ['auth', 'ui']);
+  assert.deepEqual(JSON.parse(post.opts.body).tags, ['/page', 'auth', 'ui']);
 });
 
 test('a committed chip makes the dialog sticky against backdrop clicks', async () => {
@@ -618,4 +622,45 @@ test('a committed chip makes the dialog sticky against backdrop clicks', async (
   document.querySelector('.it-recent-chip').click(); // commit a chip, nothing typed
   document.querySelector('.it-backdrop').click();
   assert.ok(document.querySelector('.it-dialog'), 'chips count as a started draft');
+});
+
+test('the capture surface is pre-filled as a route chip that does not make the draft sticky', async () => {
+  const { document } = loadWidgetWithVocab(() =>
+    Promise.resolve({ ok: true, status: 200, json: async () => VOCAB })
+  );
+  openDialog(document);
+  await tick();
+
+  const chipText = [...document.querySelectorAll('.it-chip')].map((c) => c.textContent.replace(/×\s*$/, '').trim());
+  assert.ok(chipText.includes('/page'), 'surface derived from the route is pre-filled');
+
+  // the seeded surface alone is not "user effort": an untouched form still dismisses.
+  document.querySelector('.it-backdrop').click();
+  assert.equal(document.querySelector('.it-dialog'), null, 'untouched seeded draft dismisses on outside click');
+});
+
+test('the pre-filled surface chip is removable and drops from the payload', async () => {
+  const { document, calls } = loadWidgetWithVocab(() =>
+    Promise.resolve({ ok: true, status: 200, json: async () => VOCAB })
+  );
+  openDialog(document);
+  await tick();
+  const pageChip = [...document.querySelectorAll('.it-chip')].find((c) => c.textContent.startsWith('/page'));
+  pageChip.querySelector('.it-chip-x').click();
+  document.querySelector('.it-seeing').value = 's';
+  document.querySelector('.it-expecting').value = 'e';
+  document.querySelector('.it-submit').click();
+  await tick();
+  const post = calls.find((c) => c.url === 'http://localhost:4400/api/issues');
+  assert.deepEqual(JSON.parse(post.opts.body).tags, [], 'removed surface does not ride into the payload');
+});
+
+test('the app root has no surface, so no chip is pre-filled', async () => {
+  const { document } = loadWidgetWithVocab(
+    () => Promise.resolve({ ok: true, status: 200, json: async () => VOCAB }),
+    { url: 'http://localhost:4556/' }
+  );
+  openDialog(document);
+  await tick();
+  assert.equal(document.querySelectorAll('.it-chip').length, 0, 'root URL yields no surface chip');
 });
