@@ -379,7 +379,7 @@ const TOOLS = [
 ];
 
 const server = new Server(
-  { name: 'vibeops-tracker', version: '0.1.0' },
+  { name: 'vibeops-tracker', version: '0.2.0' },
   { capabilities: { tools: {} } }
 );
 

@@ -1,6 +1,6 @@
 {
   "name": "vibeops-tracker",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "VibeOps Tracker: a local-first issue tracker. Capture, triage, and ship work across all your side projects with an embeddable widget, a Kanban board, markdown storage, and an MCP server that lets AI coding agents work your backlog.",
   "type": "module",
   "bin": {

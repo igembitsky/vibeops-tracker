@@ -62,8 +62,10 @@ trail of your last clicks (with the page each happened on), network calls
 clipped response-body snippet), and JavaScript errors. For visual issues, the
 dialog's "Point at the element" mode lets you click the exact element the
 report is about; its selector path rides along so agents skip the
-prose-to-DOM guessing. The widget never breaks the host app: if the tracker
-is down, it fails quietly and keeps your typed text.
+prose-to-DOM guessing. The tags field comes pre-filled with the route you are
+on (`/checkout`, `/settings`), so every issue is searchable by the surface it
+came from. The widget never breaks the host app: if the tracker is down, it
+fails quietly and keeps your typed text.
 
 Optionally, tell the widget about app state the URL doesn't carry (active tab,
 selected record id, git branch) with
@@ -91,6 +93,10 @@ projects, with a switcher to move between them:
   see the same priority you do.
 - **Real-time search** filters cards as you type.
 - **Click to edit** an issue's type or severity right on the card detail.
+- **Link related or duplicate issues** from the drawer. Connect tickets that
+  share a surface so they get worked and moved together, or mark a duplicate of
+  its canonical twin so agents fold it in instead of doing the work twice. Cards
+  show a small link count.
 - **Sweep** finished work into a searchable **Archive**, and **delete** stale or
   test issues outright (with a two-step confirm).
 - **Icebox** a backlog item to park it off the board, then bring it back to the
@@ -122,7 +128,8 @@ works even when the web UI isn't running.
 
 **Tools:** `get_tracker_instructions`, `list_projects`, `list_issues`,
 `search_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment`,
-`resolve_issue`, `icebox_issue`, `revive_issue`, `delete_issue`.
+`resolve_issue`, `link_issues`, `unlink_issues`, `icebox_issue`, `revive_issue`,
+`delete_issue`.
 
 ## How it stores things
 

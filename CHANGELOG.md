@@ -6,15 +6,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-08
+
 ### Added
 
 - **Capture surface as a tag.** The widget now derives the surface an issue was
-  reported on — the first path segment of the page URL, with its leading slash
-  (`/matches`, `/search-setup`, …) — and pre-fills it as a removable tag chip, so
-  issues are searchable and filterable by where they came from. The app root
-  (`/`) has no segment and gets no tag; the seeded chip doesn't make an untouched
-  draft "sticky", so an empty form still dismisses on an outside click. Raw
-  routes, no name mapping, so it generalizes to any app with routes.
+  reported on (the first path segment of the page URL, with its leading slash, so
+  `/matches`, `/search-setup`, and the like) and pre-fills it as a removable tag
+  chip, so issues are searchable and filterable by where they came from. The app
+  root (`/`) has no segment and gets no tag; the seeded chip doesn't make an
+  untouched draft "sticky", so an empty form still dismisses on an outside click.
+  Raw routes, no name mapping, so it generalizes to any app with routes.
 
 - **Linked issues (related + duplicate).** Issues can now be connected with typed,
   two-sided links, written to both markdown files at once so each stays
@@ -30,12 +32,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   **related work gets batched** (handle what shares the change together and move
   it through the board as one). Replaces the old single-scalar `related_to`,
   which still reads as one `related` link (non-destructive migration).
-
-### Changed
-
-- The `update_issue` MCP tool no longer takes `related_to`; use `link_issues`
-  instead. `create_issue`'s `relatedTo` still works and now creates a proper
-  two-sided related link.
 
 - **Point at the element.** The capture dialog gained a "Point at the element on
   the page" mode: the dialog steps aside, you click the element the report is
@@ -123,6 +119,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The `update_issue` MCP tool no longer takes `related_to`; use `link_issues`
+  instead. `create_issue`'s `relatedTo` still works and now creates a proper
+  two-sided related link.
 - Issues now track a `last_activity` timestamp that bumps only on substantive
   events (creation, a status or list move, or a comment), not on quiet edits like
   retitling, changing severity/type, retagging, or reordering. The board's card
@@ -167,4 +166,5 @@ The first open-source release of VibeOps Tracker, a local-first issue tracker.
 - **REST API** and a **Copy Prompt** generator for paste-into-a-session workflows.
 - **CLI** (`vibeops`) with `npx` and global-install support.
 
+[0.2.0]: https://github.com/igembitsky/vibeops-tracker/releases/tag/v0.2.0
 [0.1.0]: https://github.com/igembitsky/vibeops-tracker/releases/tag/v0.1.0
