@@ -690,6 +690,18 @@ body {
 .ctx-list { margin: 0; padding-left: 18px; color: var(--text); }
 .ctx-list li { margin: 2px 0; overflow-wrap: anywhere; }
 
+/* The capture's screenshot: fits the drawer, click to open full size. Bordered so a
+   white screenshot on a light board still reads as an image and not as page chrome. */
+.shot-link { display: block; }
+.shot {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+.shot-link:hover .shot { border-color: var(--accent); }
+
 details.ctx-json { margin-top: 8px; }
 details.ctx-json summary { cursor: pointer; color: var(--muted); font-size: 13px; }
 details.ctx-json pre {

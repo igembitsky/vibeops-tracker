@@ -967,6 +967,24 @@
       $drawer.appendChild(resolution);
     }
 
+    // The screenshot, when the capture carried one: what the reporter was actually
+    // looking at, above the context that describes it. Click opens the full image.
+    if (issue.screenshot) {
+      const shot = el('div', 'section');
+      shot.appendChild(el('h3', null, 'Screenshot'));
+      const link = el('a', 'shot-link');
+      link.href = `/api/issues/${encodeURIComponent(issue.id)}/screenshot`;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      const img = el('img', 'shot');
+      img.src = link.href;
+      img.alt = `What the reporter was seeing when they filed ${issue.id}`;
+      img.loading = 'lazy';
+      link.appendChild(img);
+      shot.appendChild(link);
+      $drawer.appendChild(shot);
+    }
+
     if (issue.context) {
       const ctx = el('div', 'section');
       ctx.appendChild(el('h3', null, 'Context'));
