@@ -1038,8 +1038,53 @@
       });
       row.appendChild(author);
       row.appendChild(send);
+
+      // Email the reporter (host-app relay): only when the project has a notify
+      // endpoint and the issue carries a reporter address. The button reveals four
+      // kinds; picking one sends the typed note by email AND writes it onto the
+      // ticket, one motion (the receiver posts the comment, a receipt, and a tag).
+      const project = state.projects.find((p) => p.key === issue.project);
+      const reporterEmail = issue.context?.reportedBy?.email || null;
+      const kinds = el('div', 'notify-kinds');
+      const formErr = el('div', 'form-error', '');
+      if (project?.notify_url && reporterEmail) {
+        const emailBtn = el('button', 'btn', 'Email…');
+        emailBtn.addEventListener('click', () => {
+          formErr.textContent = '';
+          kinds.classList.toggle('open');
+        });
+        row.appendChild(emailBtn);
+        kinds.appendChild(el('span', 'notify-hint', `Email ${reporterEmail} as:`));
+        for (const kind of ['Fixed', 'Deployed', 'Question', 'Closed']) {
+          const kb = el('button', 'btn notify-kind', kind);
+          kb.addEventListener('click', async () => {
+            if (!ta.value.trim()) {
+              formErr.textContent = 'Type the note first; the email carries it.';
+              return;
+            }
+            formErr.textContent = '';
+            const btns = kinds.querySelectorAll('button');
+            for (const b of btns) b.disabled = true;
+            try {
+              await api(`/api/issues/${encodeURIComponent(issue.id)}/notify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ kind: kind.toLowerCase(), comment: ta.value, author: author.value || 'igor' }),
+              });
+              openDrawer(issue.id);
+            } catch (e) {
+              formErr.textContent = `Email did not send: ${e.message}`;
+              for (const b of btns) b.disabled = false;
+            }
+          });
+          kinds.appendChild(kb);
+        }
+      }
+
       form.appendChild(ta);
       form.appendChild(row);
+      if (kinds.childNodes.length) form.appendChild(kinds);
+      form.appendChild(formErr);
       comments.appendChild(form);
     }
     $drawer.appendChild(comments);

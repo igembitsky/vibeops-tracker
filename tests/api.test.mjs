@@ -467,3 +467,80 @@ test('static serving blocks path traversal', async () => {
   const res = await fetch(`${base}/..%2f..%2fpackage.json`);
   assert.equal(res.status, 404);
 });
+
+// ---- notify relay -----------------------------------------------------------
+
+test('POST /api/issues/:id/notify relays the issue to the project notify_url', async () => {
+  // A stub receiver standing in for the host app's notify endpoint.
+  const { createServer } = await import('node:http');
+  const received = [];
+  const stub = createServer((req, res) => {
+    let raw = '';
+    req.on('data', (c) => { raw += c; });
+    req.on('end', () => {
+      received.push(JSON.parse(raw));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ sent: true, id: 're_stub_1' }));
+    });
+  });
+  await new Promise((ok) => stub.listen(0, '127.0.0.1', ok));
+  const stubUrl = `http://127.0.0.1:${stub.address().port}/notify`;
+
+  const create = await fetch(`${base}/api/issues`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      project: 'notify-demo',
+      title: 'Reporter-filed thing',
+      seeing: 'broken',
+      expecting: 'working',
+      context: { reportedBy: { tenant: 'zig', email: 'zig@example.com' } },
+    }),
+  });
+  const issue = await json(create);
+
+  // notify_url is board config, not API surface: written straight into projects.json.
+  const pf = path.join(dataDir, 'projects.json');
+  const projects = JSON.parse(fs.readFileSync(pf, 'utf8'));
+  projects.find((p) => p.key === 'notify-demo').notify_url = stubUrl;
+  fs.writeFileSync(pf, JSON.stringify(projects, null, 2));
+
+  const res = await fetch(`${base}/api/issues/${issue.id}/notify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind: 'fixed', comment: 'All patched.', author: 'igor' }),
+  });
+  assert.equal(res.status, 200);
+  assert.deepEqual(await json(res), { sent: true, id: 're_stub_1' });
+  assert.equal(received.length, 1);
+  assert.equal(received[0].kind, 'fixed');
+  assert.equal(received[0].comment, 'All patched.');
+  assert.equal(received[0].author, 'igor');
+  assert.equal(received[0].issue.id, issue.id);
+  assert.equal(received[0].issue.context.reportedBy.email, 'zig@example.com');
+
+  stub.close();
+});
+
+test('notify without a configured notify_url is a 400, cross-origin notify a 403', async () => {
+  const create = await fetch(`${base}/api/issues`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ project: 'demo', title: 'No relay here', seeing: 'x', expecting: 'y' }),
+  });
+  const issue = await json(create);
+  const res = await fetch(`${base}/api/issues/${issue.id}/notify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind: 'fixed', comment: 'note' }),
+  });
+  assert.equal(res.status, 400);
+  assert.match((await json(res)).error, /notify_url/);
+
+  const foreign = await fetch(`${base}/api/issues/${issue.id}/notify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: 'https://evil.example' },
+    body: JSON.stringify({ kind: 'fixed', comment: 'note' }),
+  });
+  assert.equal(foreign.status, 403);
+});

@@ -734,6 +734,11 @@ details.ctx-json pre {
 .comment-form input { width: 140px; }
 .comment-form button { align-self: flex-end; }
 
+/* Email-the-reporter kinds row: hidden until the Email… button opens it. */
+.notify-kinds { display: none; gap: 8px; align-items: center; flex-wrap: wrap; }
+.notify-kinds.open { display: flex; }
+.notify-hint { font-size: 12px; color: var(--muted); }
+
 .danger-zone { border-top: 1px solid var(--border); margin-top: 22px; padding-top: 14px; }
 .danger-zone h3 { color: var(--sev5); opacity: .85; }
 .btn-danger { background: #3a1717; border-color: #7f1d1d; color: #fecaca; }
