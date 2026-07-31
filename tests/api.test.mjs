@@ -544,3 +544,50 @@ test('notify without a configured notify_url is a 400, cross-origin notify a 403
   });
   assert.equal(foreign.status, 403);
 });
+
+// The board has no login, so who can reach it and who can read its responses are
+// the only two access controls it has. Both are pinned here.
+
+test('the server binds loopback only, so joining a network never exposes the board', () => {
+  assert.equal(server.address().address, '127.0.0.1');
+});
+
+test('a page the operator merely visits cannot read board content', async () => {
+  const create = await fetch(`${base}/api/issues`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ project: 'demo', title: 'Has a reporter email', seeing: 'x', expecting: 'y' }),
+  });
+  const issue = await json(create);
+
+  for (const p of ['/api/projects', '/api/projects/demo/issues', `/api/issues/${issue.id}`]) {
+    const res = await fetch(`${base}${p}`, { headers: { Origin: 'https://evil.example' } });
+    assert.equal(res.status, 200, `${p} still answers`);
+    assert.equal(res.headers.get('access-control-allow-origin'), null, `${p} grants no cross-origin read`);
+  }
+
+  // The screenshot route is the sharpest one: its body is a picture of whatever
+  // the reporter had on screen.
+  const shot = await fetch(`${base}/api/issues/${issue.id}/screenshot`, { headers: { Origin: 'https://evil.example' } });
+  assert.equal(shot.headers.get('access-control-allow-origin'), null);
+});
+
+test('the capture widget keeps the two cross-origin routes it needs', async () => {
+  const tags = await fetch(`${base}/api/projects/demo/tags`, { headers: { Origin: 'https://app.example' } });
+  assert.equal(tags.headers.get('access-control-allow-origin'), '*');
+
+  const preflight = await fetch(`${base}/api/issues`, {
+    method: 'OPTIONS',
+    headers: { Origin: 'https://app.example', 'Access-Control-Request-Method': 'POST' },
+  });
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get('access-control-allow-origin'), '*');
+
+  const filed = await fetch(`${base}/api/issues`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: 'https://app.example' },
+    body: JSON.stringify({ project: 'demo', title: 'Filed from the host app', seeing: 'x', expecting: 'y' }),
+  });
+  assert.equal(filed.status, 201);
+  assert.equal(filed.headers.get('access-control-allow-origin'), '*');
+});

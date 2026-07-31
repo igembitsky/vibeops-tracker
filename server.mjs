@@ -49,7 +49,12 @@ function serveStatic(req, res) {
   res.end(fs.readFileSync(file));
 }
 
-export function startServer({ port = 4400, dataDir }) {
+// The board is a personal tool holding reporter emails, diagnostics blobs and
+// screenshots of other people's screens, and it has no login. Binding the
+// wildcard put all of that on whatever network the laptop joins. Loopback is the
+// only correct default; HOST exists for the deliberate case (a container, a
+// tunnel) and never happens by accident.
+export function startServer({ port = 4400, host = process.env.HOST || '127.0.0.1', dataDir }) {
   const server = http.createServer(async (req, res) => {
     try {
       const handled = await handleApi(req, res, { dataDir });
@@ -62,7 +67,7 @@ export function startServer({ port = 4400, dataDir }) {
   });
   return new Promise((resolve, reject) => {
     server.on('error', reject);
-    server.listen(port, () => resolve(server));
+    server.listen(port, host, () => resolve(server));
   });
 }
 
