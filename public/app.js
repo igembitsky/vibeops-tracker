@@ -1040,9 +1040,13 @@
       row.appendChild(send);
 
       // Email the reporter (host-app relay): only when the project has a notify
-      // endpoint and the issue carries a reporter address. The button reveals four
+      // endpoint and the issue carries a reporter address. The button reveals five
       // kinds; picking one sends the typed note by email AND writes it onto the
       // ticket, one motion (the receiver posts the comment, a receipt, and a tag).
+      //
+      // Later sits before Closed on purpose: it is the honest middle answer, we read it,
+      // it is real, it is not next. Picking it only mails and comments, same as the
+      // others; moving the ticket to the icebox stays a separate, deliberate act.
       const project = state.projects.find((p) => p.key === issue.project);
       const reporterEmail = issue.context?.reportedBy?.email || null;
       const kinds = el('div', 'notify-kinds');
@@ -1055,7 +1059,7 @@
         });
         row.appendChild(emailBtn);
         kinds.appendChild(el('span', 'notify-hint', `Email ${reporterEmail} as:`));
-        for (const kind of ['Fixed', 'Deployed', 'Question', 'Closed']) {
+        for (const kind of ['Fixed', 'Deployed', 'Question', 'Later', 'Closed']) {
           const kb = el('button', 'btn notify-kind', kind);
           kb.addEventListener('click', async () => {
             if (!ta.value.trim()) {
