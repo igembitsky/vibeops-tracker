@@ -63,9 +63,23 @@ Workflow:
    repo's current state.
 3. Before coding: update_issue {id, status: "in-progress"}. Reproduce from context first.
 4. Leave add_comment notes (author: "claude") for anything notable mid-work.
-5. Finish with resolve_issue {id, resolution, modified_files}, a PR-style summary of
-   what changed, why, and how it was tested. This sets status to in-review; a HUMAN
-   moves it to done after verifying. Never set done yourself.
+5. Finish with resolve_issue {id, resolution, modified_files}. This sets status to
+   in-review; a HUMAN moves it to done after verifying. Never set done yourself.
+   The resolution is ONE text, written use-case-forward in plain speak (the human
+   verifies from it; agents get their anchors at the end), with these sections in
+   this order, each on its own bolded line:
+     **Use case impacted**: the journey, named by its surface, and why it matters
+     **What the user was doing**
+     **What happened**
+     **What was expected**
+     **The root cause**: plain-speak mechanism; analogies welcome, jargon is not
+     **Our fix**
+     **The new user experience**: what the user sees now when the same trigger fires
+     **Notes and caveats**: the agent anchors: commit sha, test status, deliberate
+       non-fixes and why, open suspects and what a recurrence would mean
+   Do NOT duplicate the resolution as a comment; comments are for mid-work progress
+   and conversation only. For tickets with no end-user journey (infra, agent-retro,
+   research), drop the sections that do not apply and treat the operator as the user.
 6. Agent retro, only when it earns its keep. After resolving, ask one question: did
    working this issue expose a concrete improvement that would make future issues
    cheaper to capture, diagnose, or fix? If not, skip the retro entirely: no comment,
@@ -279,12 +293,12 @@ const TOOLS = [
   {
     name: 'resolve_issue',
     description:
-      'Finish working an issue: record a PR-style resolution (what changed, why, how it was tested) plus the list of modified files, and move it to in-review for human verification. Use this instead of setting status done.',
+      'Finish working an issue: record a use-case-forward resolution (use case impacted, what the user was doing, what happened, what was expected, root cause, our fix, the new user experience, notes and caveats with commit sha and test status; see get_tracker_instructions) plus the list of modified files, and move it to in-review for human verification. Use this instead of setting status done.',
     inputSchema: {
       type: 'object',
       properties: {
         id: { type: 'string' },
-        resolution: { type: 'string', description: 'What you changed, why, and how it was verified' },
+        resolution: { type: 'string', description: 'Use-case-forward sections in order: use case impacted, what the user was doing, what happened, what was expected, root cause, our fix, the new user experience, notes and caveats (commit sha, tests, non-fixes)' },
         modified_files: { type: 'array', items: { type: 'string' }, description: 'Repo-relative paths you touched' },
       },
       required: ['id', 'resolution'],
