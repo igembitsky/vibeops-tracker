@@ -61,7 +61,14 @@ Workflow:
    the captured ## Context (URL, clicks, fetches, JS errors, capture-time git state) usually
    localizes the bug. Capture-time branch/worktree info may be stale, so verify against the
    repo's current state.
-3. Before coding: update_issue {id, status: "in-progress"}. Reproduce from context first.
+3. The moment you START on an issue, before any other work: update_issue {id, status:
+   "in-progress"}, and add_comment (author: "claude") naming the chat session the work is
+   happening in, so a human reading the board can open the conversation that owns it. Include
+   the session link when the harness exposes one (Claude Code prints a session URL of the form
+   https://claude.ai/code/session_<id>; use it verbatim), otherwise name the session plainly
+   and say what you are about to do. This is not only for coding: design, brainstorming,
+   research and spikes all start the same way, because a human seeing "in-progress" needs to
+   know where it is being worked and by whom. Then reproduce from context.
 4. Leave add_comment notes (author: "claude") for anything notable mid-work.
 5. Finish with resolve_issue {id, resolution, modified_files}. This sets status to
    in-review; a HUMAN moves it to done after verifying. Never set done yourself.
