@@ -63,6 +63,21 @@
     return node;
   }
 
+  // Agent-written resolutions and comments carry light markdown: the resolution
+  // contract's **bold** section labels. Rendered by building DOM nodes (text nodes
+  // and <strong>), never innerHTML, so ticket text can never smuggle markup in.
+  // The containers keep white-space: pre-wrap, so line breaks stay as they are.
+  function richText(cls, text) {
+    const box = el('div', cls);
+    const parts = String(text || '').split(/\*\*([^*\n]+)\*\*/g);
+    parts.forEach((part, i) => {
+      if (!part) return;
+      if (i % 2 === 1) box.appendChild(el('strong', null, part));
+      else box.appendChild(document.createTextNode(part));
+    });
+    return box;
+  }
+
   // ---- copy-reference button ----------------------------------------------
   // A one-click, agent-recognizable reference to a ticket. Pasting it into a
   // chat with an agent that has the VibeOps MCP server lets it resolve the
@@ -958,7 +973,7 @@
     if (issue.resolution) {
       const resolution = el('div', 'section section-resolution');
       resolution.appendChild(el('h3', null, 'Resolution'));
-      resolution.appendChild(el('div', 'prose', issue.resolution));
+      resolution.appendChild(richText('prose', issue.resolution));
       if (issue.modifiedFiles?.length) {
         const files = el('div', 'modified-files');
         for (const f of issue.modifiedFiles) files.appendChild(el('span', 'tag', f));
@@ -1014,7 +1029,7 @@
     for (const c of issue.comments) {
       const item = el('div', 'comment');
       item.appendChild(el('div', 'comment-head', `${c.author}, ${c.at ? new Date(c.at).toLocaleString() : ''}`));
-      item.appendChild(el('div', 'comment-body', c.text));
+      item.appendChild(richText('comment-body', c.text));
       comments.appendChild(item);
     }
 
